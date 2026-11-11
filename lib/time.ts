@@ -42,6 +42,20 @@ export function isoWeek(key: string): number {
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
+/** Понедельник недели, в которую входит дата. */
+export function mondayOf(key: string): string {
+  return addDays(key, 1 - weekdayOf(key));
+}
+
+/** Корректная дата вида YYYY-MM-DD в разумных пределах (год назад и год вперёд от сегодня). */
+export function isValidDateKey(key: string, now: Date = new Date()): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
+  const d = new Date(`${key}T00:00:00Z`);
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== key) return false;
+  const today = dateKey(now);
+  return key >= addDays(today, -366) && key <= addDays(today, 366);
+}
+
 /** Нечётная неделя считается верхней, чётная нижней. */
 export function weekParityOf(key: string): "upper" | "lower" {
   return isoWeek(key) % 2 === 1 ? "upper" : "lower";

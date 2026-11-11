@@ -25,7 +25,11 @@ async function myGroupId(user: CurrentUser): Promise<string | null> {
 
 /** Пары группы текущего студента на одну дату с учётом переносов, замен и отмен. */
 export async function getMyLessonsOn(user: CurrentUser, day: string): Promise<LessonView[]> {
-  const groupId = await myGroupId(user);
+  return lessonsForGroup(await myGroupId(user), day);
+}
+
+// groupId всегда берётся из профиля пользователя в сессии (myGroupId), снаружи сюда он не попадает.
+async function lessonsForGroup(groupId: string | null, day: string): Promise<LessonView[]> {
   if (!groupId) return [];
 
   const parity = weekParityOf(day);
@@ -58,6 +62,14 @@ export async function getMyLessonsOn(user: CurrentUser, day: string): Promise<Le
     };
   });
   return views.sort((a, b) => a.slot - b.slot);
+}
+
+/** Пары группы текущего студента на неделю (пн-сб), начиная с понедельника monday. */
+export async function getMyWeek(user: CurrentUser, monday: string) {
+  const days = Array.from({ length: 6 }, (_, i) => addDays(monday, i));
+  const groupId = await myGroupId(user); // один запрос на всю неделю
+  const lessons = await Promise.all(days.map((d) => lessonsForGroup(groupId, d)));
+  return days.map((date, i) => ({ date, lessons: lessons[i] }));
 }
 
 /** Следующая пара: сегодня после текущего момента, иначе в ближайшие 7 дней. */
