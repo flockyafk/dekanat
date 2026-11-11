@@ -129,6 +129,7 @@
 
 - User: id, login, passwordHash, role (student или staff).
 - Session: id, userId, expiresAt.
+- LoginAttempt: id, ключ (логин), дата. (Добавлено 12 ноября: нужна для ограничения числа попыток входа, раздел 9, пункт 6.)
 - StudentProfile: userId, ФИО, факультет, направление, курс, groupId, номер зачётки.
 - Group: id, название.
 - Course: id, название, преподаватель, форма контроля, семестр.
@@ -137,6 +138,7 @@
 - LessonChange: lessonId, дата, вид (перенос, отмена, замена аудитории), новые значения, комментарий.
 - Grade: studentId, courseId, название работы, балл, дата.
 - ExamResult: studentId, courseId, дата, результат, статус (сдано, не сдано, назначено).
+- Attendance: studentId, courseId, число проведённых занятий, число посещённых занятий. (Добавлено 14 ноября: раздел 4.3 требует посещаемость в карточке дисциплины.)
 - Deadline: courseId или groupId, название, срок.
 - Request: id, studentId, тип, текст, статус, даты создания и обновления.
 - RequestEvent: requestId, статус, комментарий, автор, дата.

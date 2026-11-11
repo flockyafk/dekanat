@@ -96,9 +96,9 @@ describe("расписание и уведомления", () => {
   });
 
   it("счётчик непрочитанных учитывает адресацию: всем, группе, лично", async () => {
-    expect(await getMyUnreadCount(await userOf("student1"))).toBe(3);
-    expect(await getMyUnreadCount(await userOf("student2"))).toBe(2);
-    expect(await getMyUnreadCount(await userOf("student3"))).toBe(1);
+    expect(await getMyUnreadCount(await userOf("student1"))).toBe(4); // всем + группа 1 (2) + лично
+    expect(await getMyUnreadCount(await userOf("student2"))).toBe(3); // всем + группа 1 (2)
+    expect(await getMyUnreadCount(await userOf("student3"))).toBe(2); // всем + группа 2
   });
 });
 

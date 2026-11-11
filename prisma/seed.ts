@@ -171,6 +171,8 @@ async function main() {
       { audience: "all", kind: "объявление", title: "Приём справок в пятницу", body: "Деканат принимает заявки до 16:00.", link: "/requests" },
       { audience: "group", groupId: g1.id, kind: "расписание", title: "Перенос пары", body: "Семинар по ТМО в среду перенесён.", link: "/schedule" },
       { audience: "student", studentId: s1.id, kind: "заявка", title: "Заявка в работе", body: "Справка об обучении принята в работу.", link: `/requests/${r1.id}` },
+      { audience: "group", groupId: g1.id, kind: "дедлайн", title: "Эссе по ТМО", body: "Эссе нужно сдать в течение трёх дней.", link: "/grades" },
+      { audience: "group", groupId: g2.id, kind: "дедлайн", title: "Лабораторная 2 по статистике", body: "Сдача лабораторной через пять дней.", link: "/grades" },
     ],
   });
 
