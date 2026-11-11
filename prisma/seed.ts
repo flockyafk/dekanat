@@ -11,6 +11,13 @@ const day = (offset: number, h = 0) => {
 };
 
 async function main() {
+  // Сид стирает все таблицы. В боевом режиме он работает только на пустой базе,
+  // иначе перезапуск контейнера уничтожил бы заявки студентов.
+  if (process.env.NODE_ENV === "production" && (await prisma.user.count()) > 0) {
+    console.log("Сид пропущен: база уже заполнена.");
+    return;
+  }
+
   // Чистим всё, сид можно запускать повторно
   await prisma.$transaction([
     prisma.notificationRead.deleteMany(),

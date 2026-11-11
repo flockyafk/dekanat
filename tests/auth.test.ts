@@ -53,6 +53,19 @@ describe("вход и выход", () => {
     await prisma.loginAttempt.deleteMany();
   });
 
+  it("параллельный перебор пароля не обходит лимит попыток", async () => {
+    await prisma.loginAttempt.deleteMany();
+    // 20 одновременных попыток, одна из них с верным паролем
+    const results = await Promise.all([
+      ...Array.from({ length: 19 }, () => login("student2", "bad")),
+      login("student2", "demo-student-2"),
+    ]);
+    expect(results.filter((r) => r.ok).length).toBeLessThanOrEqual(1);
+    // после лимита верный пароль тоже отклоняется
+    expect((await login("student2", "demo-student-2")).ok).toBe(false);
+    await prisma.loginAttempt.deleteMany();
+  });
+
   it("в базе хранится хэш, а не пароль", async () => {
     const u = await prisma.user.findUniqueOrThrow({ where: { login: "student1" } });
     expect(u.passwordHash).not.toContain("demo-student-1");
@@ -71,11 +84,18 @@ describe("доступ", () => {
     expect((await requireStaff()).role).toBe("staff");
   });
 
-  it("студент А видит только свой профиль, не профиль студента Б", async () => {
+  it("студент А и студент Б видят каждый только свой профиль", async () => {
     await login("student1", "demo-student-1");
-    const me = (await getCurrentUser())!;
-    const profile = await getMyProfile(me);
-    expect(profile?.fullName).toBe("Иванова Анна Сергеевна");
-    expect(profile?.fullName).not.toContain("Петров");
+    const a = (await getCurrentUser())!;
+    const profileA = await getMyProfile(a);
+    store.clear();
+    await login("student2", "demo-student-2");
+    const b = (await getCurrentUser())!;
+    const profileB = await getMyProfile(b);
+
+    expect(a.id).not.toBe(b.id);
+    expect(profileA?.userId).toBe(a.id);
+    expect(profileB?.userId).toBe(b.id);
+    expect(profileA?.fullName).not.toBe(profileB?.fullName);
   });
 });

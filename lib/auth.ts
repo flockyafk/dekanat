@@ -22,17 +22,22 @@ export type LoginResult = { ok: true } | { ok: false; error: string };
 export async function login(loginRaw: string, password: string): Promise<LoginResult> {
   const key = loginRaw.trim().toLowerCase();
 
-  const recent = await prisma.loginAttempt.count({
-    where: { key, createdAt: { gt: new Date(Date.now() - WINDOW_MS) } },
-  });
-  if (recent >= MAX_ATTEMPTS) {
+  if (key.length > 64) return { ok: false, error: "Неверный логин или пароль." };
+
+  // Попытку записываем ДО проверки пароля, чтобы параллельные запросы не обходили лимит.
+  // При успешном входе записи стираются.
+  const since = new Date(Date.now() - WINDOW_MS);
+  await prisma.loginAttempt.create({ data: { key } });
+  const attempts = await prisma.loginAttempt.count({ where: { key, createdAt: { gt: since } } });
+  if (attempts > MAX_ATTEMPTS) {
     return { ok: false, error: "Слишком много попыток. Подождите 15 минут." };
   }
 
   const user = await prisma.user.findUnique({ where: { login: key } });
   const valid = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH);
   if (!user || !valid) {
-    await prisma.loginAttempt.create({ data: { key } });
+    // Старые записи удаляем, чтобы таблица не росла
+    await prisma.loginAttempt.deleteMany({ where: { createdAt: { lt: since } } });
     return { ok: false, error: "Неверный логин или пароль." };
   }
 
