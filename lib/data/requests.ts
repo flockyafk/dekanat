@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import type { CurrentUser } from "@/lib/auth";
 import { MAX_REQUESTS_PER_DAY, REQUEST_TYPE_VALUES } from "@/lib/constants";
+import { withUserLock } from "@/lib/lock";
 
 /** Список заявок текущего студента, новые сверху. */
 export async function listMyRequests(user: CurrentUser) {
@@ -37,21 +38,6 @@ export async function getMyRequest(user: CurrentUser, id: string) {
 
 export type CreateRequestResult = { ok: true; id: string } | { ok: false; error: string };
 
-// Очередь по пользователю: параллельные запросы одного студента выполняются по одному,
-// поэтому суточный лимит нельзя обойти гонкой. Работает, пока сервер один (так задано в ТЗ, раздел 7).
-const locks = new Map<string, Promise<unknown>>();
-async function withUserLock<T>(userId: string, fn: () => Promise<T>): Promise<T> {
-  const previous = locks.get(userId) ?? Promise.resolve();
-  const run = previous.then(fn, fn);
-  const tail = run.catch(() => undefined);
-  locks.set(userId, tail);
-  try {
-    return await run;
-  } finally {
-    if (locks.get(userId) === tail) locks.delete(userId);
-  }
-}
-
 /** Создание заявки от имени текущего студента. studentId берётся только из сессии. */
 export async function createMyRequest(user: CurrentUser, type: string, rawText: string): Promise<CreateRequestResult> {
   if (user.role !== "student") return { ok: false, error: "Заявки подают студенты." };
@@ -60,7 +46,7 @@ export async function createMyRequest(user: CurrentUser, type: string, rawText: 
   const text = rawText.trim();
   if (text.length < 10 || text.length > 1000) return { ok: false, error: "Текст заявки: от 10 до 1000 символов." };
 
-  return withUserLock(user.id, async (): Promise<CreateRequestResult> => {
+  return withUserLock(`req:${user.id}`, async (): Promise<CreateRequestResult> => {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const sent = await prisma.request.count({ where: { studentId: user.id, createdAt: { gt: since } } });
     if (sent >= MAX_REQUESTS_PER_DAY) {

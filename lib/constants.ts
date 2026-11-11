@@ -15,4 +15,7 @@ export type RequestStatus = (typeof REQUEST_STATUSES)[number];
 /** Статусы, которые может поставить сотрудник (вернуть в «Отправлена» нельзя). */
 export const STAFF_STATUSES = ["В работе", "Готова", "Отклонена"] as const;
 
+/** Статусы для фильтра в кабинете сотрудника. */
+export const STAFF_FILTER_STATUSES = REQUEST_STATUSES;
+
 export const MAX_REQUESTS_PER_DAY = 10;

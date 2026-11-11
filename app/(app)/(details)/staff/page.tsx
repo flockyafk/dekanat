@@ -1,0 +1,76 @@
+import Link from "next/link";
+import { requireStaff } from "@/lib/auth";
+import { STAFF_FILTER_STATUSES } from "@/lib/constants";
+import { listGroupsForStaff, listRequestsForStaff } from "@/lib/data/staff";
+import { Card, EmptyText, PageShell } from "@/components/ui";
+import { StatusBadge } from "@/components/status-badge";
+import { formatDateTimeRu } from "@/lib/time";
+import { logoutAction } from "@/app/login/actions";
+import { AnnouncementForm, StatusForm } from "./staff-forms";
+
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Кабинет сотрудника — Мой деканат" };
+
+// Страница лежит в группе (details) без экрана загрузки: студент получает настоящий код 404.
+export default async function StaffPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const user = await requireStaff();
+  const raw = (await searchParams).status;
+  const status = typeof raw === "string" && (STAFF_FILTER_STATUSES as readonly string[]).includes(raw) ? raw : undefined;
+
+  const [requests, groups] = await Promise.all([listRequestsForStaff(user, status), listGroupsForStaff(user)]);
+
+  return (
+    <PageShell title="Кабинет сотрудника">
+      <Card title="Новое объявление" id="announce">
+        <AnnouncementForm groups={groups} />
+      </Card>
+
+      <Card title="Заявки студентов" id="requests">
+        <nav aria-label="Фильтр по статусу" className="mb-3 flex flex-wrap gap-2">
+          {[undefined, ...STAFF_FILTER_STATUSES].map((s) => (
+            <Link
+              key={s ?? "all"}
+              href={s ? `/staff?status=${encodeURIComponent(s)}` : "/staff"}
+              aria-current={status === s ? "true" : undefined}
+              className={`flex min-h-11 items-center rounded-lg border px-3 text-sm ${
+                status === s ? "border-brand bg-brand text-white" : "border-line bg-surface"
+              }`}
+            >
+              {s ?? "Все"}
+            </Link>
+          ))}
+        </nav>
+
+        {requests.length === 0 ? (
+          <EmptyText>Заявок с таким статусом нет.</EmptyText>
+        ) : (
+          <ul className="space-y-4">
+            {requests.map((r) => (
+              <li key={r.id} className="rounded-lg border border-line p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-semibold">{r.type}</p>
+                    <p className="text-sm text-muted">
+                      {r.studentName}, {r.groupName}
+                    </p>
+                    <p className="text-sm text-muted">{formatDateTimeRu(r.createdAt)}</p>
+                  </div>
+                  <StatusBadge status={r.status} />
+                </div>
+                <p className="mt-2 whitespace-pre-wrap">{r.text}</p>
+                {r.lastComment && <p className="mt-1 text-sm text-muted">Последний комментарий: {r.lastComment}</p>}
+                <StatusForm requestId={r.id} current={r.status} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <form action={logoutAction}>
+        <button type="submit" className="h-11 w-full rounded-md border border-line bg-surface font-medium">
+          Выйти
+        </button>
+      </form>
+    </PageShell>
+  );
+}

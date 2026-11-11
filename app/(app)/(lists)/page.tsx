@@ -6,18 +6,24 @@ import { getMyProfile } from "@/lib/data/profile";
 import { Badge, Card, EmptyText, PageShell } from "@/components/ui";
 import { dateKey, formatDateTimeRu, formatMinutes, WEEKDAYS_FULL, formatDateRu, weekdayOf } from "@/lib/time";
 import { redirect } from "next/navigation";
+import { AskBox } from "@/components/ask-box";
+import { dailyLimit } from "@/lib/ai";
+import { getMyAiUsageToday } from "@/lib/data/assistant";
 
 export const metadata = { title: "Сегодня — Мой деканат" };
 export const dynamic = "force-dynamic";
-
-const EXAMPLES = ["Что у меня завтра?", "Какие у меня долги?", "Когда ближайший дедлайн?", "В каком статусе моя справка?"];
 
 export default async function TodayPage() {
   const user = await requireUser();
   if (user.role === "staff") redirect("/staff");
 
-  const [profile, data] = await Promise.all([getMyProfile(user), getTodayData(user)]);
+  const [profile, data, used] = await Promise.all([
+    getMyProfile(user),
+    getTodayData(user),
+    getMyAiUsageToday(user, dateKey()),
+  ]);
   const next = data.next;
+  const remaining = Math.max(0, dailyLimit() - used);
 
   return (
     <PageShell title="Сегодня">
@@ -128,32 +134,7 @@ export default async function TodayPage() {
       </Card>
 
       <Card title="Спроси деканат" id="ask">
-        <form action="/assistant" className="flex gap-2">
-          <label htmlFor="q" className="sr-only">
-            Ваш вопрос
-          </label>
-          <input
-            id="q"
-            name="q"
-            placeholder="Например: что у меня завтра?"
-            className="h-11 min-w-0 flex-1 rounded-md border border-line bg-surface px-3 text-base"
-          />
-          <button type="submit" className="h-11 rounded-md bg-brand px-4 font-medium text-white">
-            Спросить
-          </button>
-        </form>
-        <ul className="mt-3 flex flex-wrap gap-2">
-          {EXAMPLES.map((e) => (
-            <li key={e}>
-              <Link
-                href={`/assistant?q=${encodeURIComponent(e)}`}
-                className="inline-flex min-h-11 items-center rounded-lg border border-line px-3 text-sm"
-              >
-                {e}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <AskBox compact remaining={remaining} />
       </Card>
     </PageShell>
   );
