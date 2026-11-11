@@ -29,6 +29,7 @@ async function main() {
     prisma.loginAttempt.deleteMany(),
     prisma.session.deleteMany(),
     prisma.deadline.deleteMany(),
+    prisma.attendance.deleteMany(),
     prisma.examResult.deleteMany(),
     prisma.grade.deleteMany(),
     prisma.lessonChange.deleteMany(),
@@ -126,7 +127,20 @@ async function main() {
       { studentId: s1.id, courseId: c1.id, date: day(25), status: "назначено" },
       { studentId: s1.id, courseId: c2.id, date: day(20), status: "назначено" },
       { studentId: s2.id, courseId: c2.id, date: day(-5), status: "не сдано", result: "незачёт" },
+      { studentId: s1.id, courseId: c3.id, date: day(28), status: "назначено" },
+      { studentId: s2.id, courseId: c1.id, date: day(26), status: "назначено" },
       { studentId: s3.id, courseId: c4.id, date: day(22), status: "назначено" },
+      { studentId: s3.id, courseId: c2.id, date: day(-3), status: "сдано", result: "зачтено" },
+    ],
+  });
+
+  // Посещаемость: held занятий проведено, attended посещено. У студентов разная.
+  const at = (studentId: string, courseId: string, held: number, attended: number) => ({ studentId, courseId, held, attended });
+  await prisma.attendance.createMany({
+    data: [
+      at(s1.id, c1.id, 14, 13), at(s1.id, c2.id, 14, 14), at(s1.id, c3.id, 14, 9),
+      at(s2.id, c1.id, 14, 14), at(s2.id, c2.id, 14, 8), at(s2.id, c3.id, 14, 12),
+      at(s3.id, c2.id, 14, 14), at(s3.id, c3.id, 14, 13), at(s3.id, c4.id, 14, 11),
     ],
   });
 

@@ -37,6 +37,16 @@ describe("экран «Сегодня»: данные только своего 
     expect(s2.summary.debts).toBe(1);
   });
 
+  it("ближайший экзамен и долги на «Сегодня» принадлежат своему студенту", async () => {
+    const s1 = await getTodayData(await userOf("student1"));
+    const s2 = await getTodayData(await userOf("student2"));
+    const s3 = await getTodayData(await userOf("student3"));
+    expect(s1.summary.exam?.title).toBe("Деловой английский");
+    expect(s2.summary.exam?.title).toBe("Теория международных отношений");
+    expect(s3.summary.exam?.title).toBe("Статистика");
+    expect(s1.summary.debts).toBe(0); // долг студента 2 не попадает к студенту 1
+  });
+
   it("дедлайны и заявки не попадают к чужому студенту", async () => {
     const s1 = await getTodayData(await userOf("student1"));
     const s2 = await getTodayData(await userOf("student2"));

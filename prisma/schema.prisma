@@ -21,6 +21,7 @@ model User {
   enrollments   Enrollment[]
   grades        Grade[]
   examResults   ExamResult[]
+  attendance    Attendance[]
   requests      Request[]
   reads         NotificationRead[]
   aiUsage       AiUsage[]
@@ -76,6 +77,7 @@ model Course {
   lessons     Lesson[]
   grades      Grade[]
   examResults ExamResult[]
+  attendance  Attendance[]
   deadlines   Deadline[]
 }
 
@@ -141,6 +143,19 @@ model ExamResult {
   course    Course   @relation(fields: [courseId], references: [id])
 
   @@index([studentId])
+}
+
+// Посещаемость: сколько занятий было и сколько студент посетил.
+// Добавлена к модели из ТЗ (раздел 8), потому что раздел 4.3 требует посещаемость в карточке дисциплины.
+model Attendance {
+  studentId String
+  courseId  String
+  held      Int
+  attended  Int
+  student   User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course    Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@id([studentId, courseId])
 }
 
 model Deadline {

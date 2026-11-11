@@ -4,6 +4,7 @@ import type { CurrentUser } from "@/lib/auth";
 import { dateKey } from "@/lib/time";
 import { getMyLessonsOn, getMyNextLesson } from "@/lib/data/schedule";
 import { getMyLatestAnnouncements } from "@/lib/data/notifications";
+import { getMyStanding } from "@/lib/data/grades";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -50,9 +51,7 @@ export async function getTodayData(user: CurrentUser, now: Date = new Date()) {
   });
 
   // Сводка учёбы
-  const grades = await prisma.grade.findMany({ where: { studentId: user.id }, select: { score: true } });
-  const average = grades.length ? Math.round(grades.reduce((s, g) => s + g.score, 0) / grades.length) : null;
-  const debts = await prisma.examResult.count({ where: { studentId: user.id, status: "не сдано" } });
+  const { average, debts } = await getMyStanding(user);
   const exam = await prisma.examResult.findFirst({
     where: { studentId: user.id, status: "назначено", date: { gte: now } },
     orderBy: { date: "asc" },
