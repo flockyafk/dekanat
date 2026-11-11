@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Роли и статусы хранятся строками, значения проверяет zod (lib/constants.ts).
+
+model User {
+  id           String   @id @default(cuid())
+  login        String   @unique
+  passwordHash String
+  role         String   @default("student") // student | staff
+  createdAt    DateTime @default(now())
+
+  profile       StudentProfile?
+  sessions      Session[]
+  enrollments   Enrollment[]
+  grades        Grade[]
+  examResults   ExamResult[]
+  requests      Request[]
+  reads         NotificationRead[]
+  aiUsage       AiUsage[]
+  notifications Notification[]
+}
+
+model Session {
+  id        String   @id // хэш токена, сам токен только в cookie
+  userId    String
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  key       String // логин в нижнем регистре
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+}
+
+model Group {
+  id       String @id @default(cuid())
+  name     String @unique
+  profiles StudentProfile[]
+  lessons  Lesson[]
+  deadlines Deadline[]
+  notifications Notification[]
+}
+
+model StudentProfile {
+  userId     String @id
+  fullName   String
+  faculty    String
+  direction  String
+  course     Int
+  groupId    String
+  recordBook String // номер зачётки, вымышленный
+  email      String
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group      Group  @relation(fields: [groupId], references: [id])
+}
+
+model Course {
+  id          String @id @default(cuid())
+  title       String
+  teacher     String
+  control     String // зачёт | экзамен
+  semester    Int
+  enrollments Enrollment[]
+  lessons     Lesson[]
+  grades      Grade[]
+  examResults ExamResult[]
+  deadlines   Deadline[]
+}
+
+model Enrollment {
+  studentId String
+  courseId  String
+  student   User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course    Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@id([studentId, courseId])
+}
+
+model Lesson {
+  id         String @id @default(cuid())
+  groupId    String
+  courseId   String
+  weekday    Int // 1 = понедельник ... 6 = суббота
+  slot       Int // номер пары 1..6
+  weekParity String // upper | lower | both
+  room       String
+  kind       String // лекция | семинар | практика
+  group      Group  @relation(fields: [groupId], references: [id])
+  course     Course @relation(fields: [courseId], references: [id])
+  changes    LessonChange[]
+
+  @@index([groupId, weekday])
+}
+
+model LessonChange {
+  id        String   @id @default(cuid())
+  lessonId  String
+  date      DateTime
+  kind      String // перенос | отмена | замена аудитории
+  newRoom   String?
+  newSlot   Int?
+  newDate   DateTime?
+  comment   String?
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+}
+
+model Grade {
+  id        String   @id @default(cuid())
+  studentId String
+  courseId  String
+  title     String
+  score     Int
+  maxScore  Int      @default(100)
+  date      DateTime
+  student   User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id])
+
+  @@index([studentId])
+}
+
+model ExamResult {
+  id        String   @id @default(cuid())
+  studentId String
+  courseId  String
+  date      DateTime
+  result    String? // оценка или «зачтено»
+  status    String // сдано | не сдано | назначено
+  student   User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id])
+
+  @@index([studentId])
+}
+
+model Deadline {
+  id       String   @id @default(cuid())
+  courseId String?
+  groupId  String?
+  title    String
+  dueAt    DateTime
+  course   Course?  @relation(fields: [courseId], references: [id])
+  group    Group?   @relation(fields: [groupId], references: [id])
+}
+
+model Request {
+  id        String   @id @default(cuid())
+  studentId String
+  type      String
+  text      String
+  status    String   @default("Отправлена")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  student   User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  events    RequestEvent[]
+
+  @@index([studentId])
+}
+
+model RequestEvent {
+  id        String   @id @default(cuid())
+  requestId String
+  status    String
+  comment   String?
+  author    String
+  createdAt DateTime @default(now())
+  request   Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  audience  String // all | group | student
+  groupId   String?
+  studentId String?
+  kind      String // объявление | расписание | дедлайн | заявка
+  title     String
+  body      String
+  link      String?
+  createdAt DateTime @default(now())
+  group     Group?   @relation(fields: [groupId], references: [id])
+  student   User?    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  reads     NotificationRead[]
+}
+
+model NotificationRead {
+  notificationId String
+  userId         String
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([notificationId, userId])
+}
+
+model AiUsage {
+  userId String
+  date   String // YYYY-MM-DD
+  count  Int    @default(0)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, date])
+}
