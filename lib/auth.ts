@@ -69,6 +69,12 @@ export async function logout() {
   jar.delete(SESSION_COOKIE);
 }
 
+/** Идентификатор текущей сессии (хэш токена), нужен при смене пароля. */
+export async function getCurrentSessionId(): Promise<string | undefined> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  return token ? hashToken(token) : undefined;
+}
+
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;

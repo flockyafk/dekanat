@@ -1,6 +1,7 @@
 // Вымышленные данные. Реальных людей, оценок и номеров здесь нет.
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { refreshDemoDates } from "./refresh-demo";
 
 const prisma = new PrismaClient();
 const day = (offset: number, h = 0) => {
@@ -11,9 +12,9 @@ const day = (offset: number, h = 0) => {
 };
 
 async function main() {
-  // Сид стирает все таблицы. В боевом режиме он работает только на пустой базе,
-  // иначе перезапуск контейнера уничтожил бы заявки студентов.
-  if (process.env.NODE_ENV === "production" && (await prisma.user.count()) > 0) {
+  // Сид стирает все таблицы. При SEED_ONLY_IF_EMPTY=1 (его ставит docker-entrypoint.sh)
+  // он работает только на пустой базе, иначе перезапуск контейнера уничтожил бы заявки студентов.
+  if (process.env.SEED_ONLY_IF_EMPTY === "1" && (await prisma.user.count()) > 0) {
     console.log("Сид пропущен: база уже заполнена.");
     return;
   }
@@ -85,6 +86,7 @@ async function main() {
   // Расписание: у групп разное
   const L = (groupId: string, courseId: string, weekday: number, slot: number, weekParity: string, room: string, kind: string) =>
     ({ groupId, courseId, weekday, slot, weekParity, room, kind });
+  // Группа 1 (МО-231): понедельник-пятница. Группа 2 (МЭО-232): другой набор и другие дни.
   await prisma.lesson.createMany({
     data: [
       L(g1.id, c1.id, 1, 1, "both", "301", "лекция"),
@@ -92,9 +94,17 @@ async function main() {
       L(g1.id, c3.id, 2, 2, "upper", "215", "лекция"),
       L(g1.id, c3.id, 2, 2, "lower", "216", "семинар"),
       L(g1.id, c1.id, 3, 1, "both", "305", "семинар"),
+      L(g1.id, c2.id, 3, 3, "both", "412", "практика"),
+      L(g1.id, c3.id, 4, 2, "both", "215", "лекция"),
+      L(g1.id, c1.id, 4, 3, "both", "301", "семинар"),
+      L(g1.id, c2.id, 5, 1, "upper", "412", "семинар"),
+      L(g1.id, c3.id, 5, 2, "both", "216", "практика"),
       L(g2.id, c3.id, 1, 2, "both", "210", "лекция"),
       L(g2.id, c4.id, 2, 1, "both", "118", "практика"),
       L(g2.id, c2.id, 3, 3, "both", "414", "семинар"),
+      L(g2.id, c3.id, 4, 1, "both", "210", "семинар"),
+      L(g2.id, c4.id, 4, 4, "both", "118", "лекция"),
+      L(g2.id, c2.id, 5, 2, "both", "414", "практика"),
     ],
   });
 
@@ -120,12 +130,8 @@ async function main() {
     ],
   });
 
-  await prisma.deadline.createMany({
-    data: [
-      { courseId: c1.id, groupId: g1.id, title: "Сдать эссе по ТМО", dueAt: day(3, 18) },
-      { courseId: c4.id, groupId: g2.id, title: "Лабораторная 2 по статистике", dueAt: day(5, 18) },
-    ],
-  });
+  // Дедлайны и переносы пар зависят от текущей даты, их создаёт refreshDemoDates
+  await refreshDemoDates(prisma);
 
   const r1 = await prisma.request.create({
     data: {

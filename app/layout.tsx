@@ -13,7 +13,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="ru">
       <body className="flex min-h-dvh flex-col antialiased">
         {children}
-        <footer className="border-t border-line px-4 py-4 text-center text-xs text-muted">
+        <footer className="border-t border-line px-4 pb-20 pt-4 text-center text-xs text-muted md:pb-4">
           Концепт для MGIMO AI Challenge. Не официальный сервис вуза
         </footer>
       </body>
