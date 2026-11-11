@@ -1,5 +1,9 @@
 # Деплой на Amvera
 
+**Адрес сайта:** https://dekanat-flockyafk.msk1.amvera.tech
+Статус на 12 ноября: сайт открывается без VPN, вход работает с компьютера и с телефона (проверил человек).
+Обновление сайта: `git push amvera main:master`.
+
 Что настроено в репозитории:
 - `Dockerfile`: сборка Next.js, Prisma, запуск через `docker-entrypoint.sh`.
 - `amvera.yaml`: `persistenceMount: /data` (постоянное хранилище), `containerPort: 8080`.
