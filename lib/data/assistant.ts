@@ -107,6 +107,22 @@ export async function getAssistantContext(user: CurrentUser, now: Date = new Dat
 
 export type AssistantContext = Awaited<ReturnType<typeof getAssistantContext>>;
 
+/**
+ * Контекст для черновика заявки: только сведения о самом студенте и его дисциплинах.
+ * Собирается из данных текущего студента из сессии, заявок и оценок других студентов тут нет.
+ */
+export async function getDraftContext(user: CurrentUser) {
+  const [profile, courses] = await Promise.all([getMyProfile(user), getMyCourses(user)]);
+  return {
+    student: profile
+      ? { name: profile.fullName, group: profile.group.name, course: profile.course, direction: profile.direction }
+      : null,
+    courses: courses.map((c) => ({ title: c.title, control: c.control, debt: c.debt })),
+  };
+}
+
+export type DraftContext = Awaited<ReturnType<typeof getDraftContext>>;
+
 /** Сколько запросов к ИИ у студента уже потрачено сегодня (только число). */
 export async function getMyAiUsageToday(user: CurrentUser, day: string): Promise<number> {
   const row = await prisma.aiUsage.findUnique({ where: { userId_date: { userId: user.id, date: day } } });

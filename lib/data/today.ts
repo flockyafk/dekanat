@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import type { CurrentUser } from "@/lib/auth";
 import { dateKey } from "@/lib/time";
-import { getMyLessonsOn, getMyNextLesson } from "@/lib/data/schedule";
+import { getMyLessonsOn, getMyNextLesson, getMyUpcomingChanges } from "@/lib/data/schedule";
 import { getMyLatestAnnouncements } from "@/lib/data/notifications";
 import { getMyStanding } from "@/lib/data/grades";
 
@@ -15,10 +15,11 @@ export async function getTodayData(user: CurrentUser, now: Date = new Date()) {
     select: { groupId: true },
   });
 
-  const [lessonsToday, next, announcements] = await Promise.all([
+  const [lessonsToday, next, announcements, upcomingChanges] = await Promise.all([
     getMyLessonsOn(user, dateKey(now)),
     getMyNextLesson(user, now),
     getMyLatestAnnouncements(user, 3),
+    getMyUpcomingChanges(user, now),
   ]);
   const changes = lessonsToday.filter((l) => l.change);
 
@@ -61,6 +62,7 @@ export async function getTodayData(user: CurrentUser, now: Date = new Date()) {
   return {
     next,
     changes,
+    upcomingChanges,
     deadlines: deadlines.map((d) => ({ id: d.id, title: d.title, course: d.course?.title ?? null, dueAt: d.dueAt })),
     requests,
     summary: { average, debts, exam: exam ? { title: exam.course.title, date: exam.date } : null },

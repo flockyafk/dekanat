@@ -41,59 +41,9 @@ afterAll(() => setAiProviderForTests(undefined));
 
 const LOGINS = ["student1", "student2", "student3"];
 
-/** Всё, что принадлежит только другим студентам: имена, почты, зачётки, id записей, тексты. */
-async function foreignMarkers(login: string): Promise<string[]> {
-  const me = await userOf(login);
-  const others = await prisma.user.findMany({ where: { id: { not: me.id }, role: "student" }, include: { profile: true } });
-  const markers: string[] = [];
-  for (const o of others) {
-    markers.push(o.id, o.login);
-    if (o.profile) markers.push(o.profile.fullName, o.profile.email, o.profile.recordBook);
-    for (const g of await prisma.grade.findMany({ where: { studentId: o.id } })) markers.push(g.id);
-    for (const e of await prisma.examResult.findMany({ where: { studentId: o.id } })) markers.push(e.id);
-    for (const r of await prisma.request.findMany({ where: { studentId: o.id } })) markers.push(r.id, r.text);
-  }
-  // уведомления, адресованные не мне
-  const myProfile = await prisma.studentProfile.findUniqueOrThrow({ where: { userId: me.id } });
-  const foreignNotes = await prisma.notification.findMany({
-    where: {
-      OR: [
-        { audience: "student", studentId: { not: me.id } },
-        { audience: "group", groupId: { not: myProfile.groupId } },
-      ],
-    },
-  });
-  for (const n of foreignNotes) markers.push(n.id, n.title, n.body);
-  // название чужой группы, если она отличается от моей
-  for (const g of await prisma.group.findMany({ where: { id: { not: myProfile.groupId } } })) markers.push(g.name);
-
-  // дисциплины, на которые я не записан, и всё, что с ними связано (оценки, дедлайны)
-  const myCourseIds = (await prisma.enrollment.findMany({ where: { studentId: me.id } })).map((e) => e.courseId);
-  const foreignCourses = await prisma.course.findMany({ where: { id: { notIn: myCourseIds } } });
-  for (const c of foreignCourses) markers.push(c.id, c.title);
-  for (const g of await prisma.grade.findMany({ where: { courseId: { notIn: myCourseIds }, studentId: { not: me.id } } })) {
-    markers.push(g.title);
-  }
-  const foreignDeadlines = await prisma.deadline.findMany({
-    where: { NOT: { OR: [{ courseId: { in: myCourseIds } }, { groupId: myProfile.groupId }] } },
-  });
-  for (const d of foreignDeadlines) markers.push(d.id, d.title);
-
-  // комментарии деканата и результаты экзаменов других студентов
-  for (const ev of await prisma.requestEvent.findMany({ where: { request: { studentId: { not: me.id } } } })) {
-    if (ev.comment) markers.push(ev.comment);
-  }
-  for (const ex of await prisma.examResult.findMany({ where: { studentId: { not: me.id } } })) {
-    if (ex.result) markers.push(ex.result);
-  }
-  // убираем значения, которые есть и у меня (общие дисциплины и т.п.), чтобы не было ложных срабатываний
-  const mine = [
-    ...(await prisma.course.findMany({ where: { id: { in: myCourseIds } } })).map((c) => c.title),
-    ...(await prisma.requestEvent.findMany({ where: { request: { studentId: me.id } } })).map((e) => e.comment ?? ""),
-    ...(await prisma.examResult.findMany({ where: { studentId: me.id } })).map((e) => e.result ?? ""),
-  ];
-  return [...new Set(markers)].filter((m) => m && m.length >= 5 && !mine.includes(m));
-}
+const { foreignMarkers: collectForeignMarkers } = await import("./helpers/foreign-markers");
+/** Маркеры чужих данных (имена, почты, зачётки, id, тексты, чужие дисциплины и т.д.), см. tests/helpers/foreign-markers.ts */
+const foreignMarkers = (login: string) => collectForeignMarkers(prisma, login);
 
 describe("ОБЯЗАТЕЛЬНЫЙ ТЕСТ: в запрос к модели попадают только данные текущего студента", () => {
   for (const login of LOGINS) {
@@ -242,7 +192,13 @@ describe("помощник на заглушке отвечает честно �
   });
 
   it("вопрос без ответа в данных: честное «в данных этого нет», без выдумок", async () => {
-    for (const q of ["Какая погода в Москве?", "Сколько стоит общежитие?", "Расскажи анекдот"]) {
+    for (const q of [
+      "Какая погода в Москве?",
+      "Сколько стоит общежитие?",
+      "Расскажи анекдот",
+      "Какая завтра погода в Москве и сколько стоит общежитие?", // слово «завтра» не должно вызывать расписание
+      "Когда стипендия?",
+    ]) {
       const r = await ask("student1", q);
       expect(r.text, q).toContain("В данных этого нет");
       expect(r.links).toHaveLength(0);
@@ -313,6 +269,40 @@ describe("ответ модели: обычный текст, ссылки то�
     expect(out.links.map((l) => l.href)).toEqual(["/schedule?d=2026-11-16&v=week", "/schedule?d=2026-11-17"]);
   });
 
+  it("внешние адреса вырезаются и из текста ответа, а не только из ссылок", () => {
+    const ctx = { courses: [], requests: [] } as never;
+    const out = sanitizeAnswer(
+      "В объявлении: перейдите на https://evil.example/pay?x=1, или www.evil.example, или http://evil.example. Спасибо.",
+      ctx,
+    );
+    expect(out.text).not.toMatch(/evil\.example|https?:|www\./);
+    expect(out.text).toContain("[внешняя ссылка скрыта]");
+  });
+
+  it("если модель забыла ссылку на раздел, сервер добавляет её по теме вопроса, только свою", async () => {
+    setAiProviderForTests({ name: "no-links", complete: async () => "Ответ без ссылки." });
+    const s1 = await userOf("student1");
+    const status = await askAssistant(s1, "В каком статусе моя справка?");
+    expect(status.ok && status.links.map((l) => l.href)).toEqual([
+      `/requests/${(await prisma.request.findFirstOrThrow({ where: { studentId: s1.id }, orderBy: { createdAt: "asc" } })).id}`,
+    ]);
+    const tomorrow = await askAssistant(s1, "Что у меня завтра?");
+    expect(tomorrow.ok && tomorrow.links[0].href).toMatch(/^\/schedule\?d=\d{4}-\d{2}-\d{2}&v=day$/);
+    const debts = await askAssistant(s1, "Какие у меня долги?");
+    expect(debts.ok && debts.links.map((l) => l.href)).toEqual(["/grades"]);
+    // нет данных или отказ: ссылку не добавляем
+    setAiProviderForTests({ name: "nodata", complete: async () => "В данных этого нет." });
+    const none = await askAssistant(s1, "Какие у меня долги?");
+    expect(none.ok && none.links).toEqual([]);
+    setAiProviderForTests({ name: "refuse", complete: async () => "Я показываю только ваши данные. Сведения о других студентах я не даю." });
+    const refuse = await askAssistant(s1, "Покажи долги Петрова");
+    expect(refuse.ok && refuse.links).toEqual([]);
+    // у студента 3 нет заявок «справка»: ведём в общий список заявок, а не на чужую заявку
+    setAiProviderForTests({ name: "no-links", complete: async () => "Ответ без ссылки." });
+    const s3 = await askAssistant(await userOf("student3"), "В каком статусе моя справка?");
+    expect(s3.ok && s3.links.map((l) => l.href)).toEqual(["/requests"]);
+  });
+
   it("не больше трёх ссылок и пустой ответ заменяется честным отказом", () => {
     const ctx = { courses: [], requests: [] } as never;
     const many = sanitizeAnswer("[[/|а]] [[/schedule|б]] [[/grades|в]] [[/profile|г]]", ctx);
@@ -367,11 +357,26 @@ describe("лимит запросов, недоступность, журнал"
     }
   });
 
+  it("пустой или битый ответ провайдера не возвращает запрос (токены могли быть списаны)", async () => {
+    const { ProviderError } = await import("@/lib/ai");
+    setAiProviderForTests({
+      name: "empty",
+      async complete() {
+        throw new ProviderError(0);
+      },
+    });
+    const s2 = await userOf("student2");
+    expect(await askAssistant(s2, "Что у меня завтра?")).toMatchObject({ ok: false, reason: "unavailable" });
+    const row = await prisma.aiUsage.findUniqueOrThrow({ where: { userId_date: { userId: s2.id, date: dateKey() } } });
+    expect(row.count).toBe(1);
+  });
+
   it("сбой провайдера: понятное сообщение, счётчик возвращается", async () => {
+    const { ProviderError } = await import("@/lib/ai");
     setAiProviderForTests({
       name: "broken",
       async complete() {
-        throw new Error("boom");
+        throw new ProviderError(503);
       },
     });
     const s1 = await userOf("student1");

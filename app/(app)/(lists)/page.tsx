@@ -68,6 +68,24 @@ export default async function TodayPage() {
             ))}
           </ul>
         )}
+        {data.upcomingChanges.length > 0 && (
+          <div className="mt-3">
+            <h3 className="mb-2 text-sm font-medium">В ближайшие дни</h3>
+            <ul className="space-y-3">
+              {data.upcomingChanges.map(({ date, lesson: l }) => (
+                <li key={`${date}-${l.id}`} className={`rounded-md p-3 ${l.cancelled ? "bg-danger-bg" : "bg-warn-bg"}`}>
+                  <p className={`font-semibold ${l.cancelled ? "text-danger" : "text-warn"}`}>
+                    {WEEKDAYS_FULL[weekdayOf(date) % 7]}, {formatDateRu(date)}: {l.change?.text}
+                  </p>
+                  <p>
+                    {l.title}, {l.start}–{l.end}
+                  </p>
+                  {l.change?.comment && <p className="text-sm text-muted">{l.change.comment}</p>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <Link href="/schedule" className="mt-3 inline-flex min-h-11 items-center gap-1 text-brand underline">
           Всё расписание <ArrowRight aria-hidden className="size-4" />
         </Link>

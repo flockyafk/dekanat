@@ -110,6 +110,37 @@ describe("переносы, замены и отмены", () => {
   });
 });
 
+describe("ближайшие изменения на «Сегодня» (getMyUpcomingChanges)", () => {
+  const ids: string[] = [];
+  afterAll(async () => {
+    await prisma.lessonChange.deleteMany({ where: { id: { in: ids } } });
+  });
+
+  it("студент видит изменения своей группы в ближайшие дни, студент другой группы не видит", async () => {
+    const { getMyUpcomingChanges: fn } = await import("@/lib/data/schedule");
+    const s1 = await userOf("student1");
+    const s2 = await userOf("student2");
+    const s3 = await userOf("student3");
+    const now = new Date("2026-11-15T09:00:00Z"); // воскресенье: ближайшие дни понедельник 16, вторник 17, среда 18
+
+    const lessons = await getMyLessonsOn(s1, UPPER_MON);
+    const change = await prisma.lessonChange.create({
+      data: { lessonId: lessons[0].id, date: dayStart(UPPER_MON), kind: "отмена", comment: "тест ближайших изменений" },
+    });
+    ids.push(change.id);
+
+    const a = await fn(s1, now);
+    const b = await fn(s2, now); // та же группа
+    const c = await fn(s3, now); // другая группа
+    expect(a.map((x) => `${x.date} ${x.lesson.id} ${x.lesson.cancelled}`)).toEqual([`${UPPER_MON} ${lessons[0].id} true`]);
+    expect(b.map((x) => x.lesson.id)).toEqual([lessons[0].id]);
+    expect(c).toEqual([]); // изменение группы 1 не видно группе 2
+    expect((await fn(await userOf("staff"), now))).toEqual([]);
+    // сегодняшний день и дни за пределами трёх не попадают
+    expect(await fn(s1, new Date("2026-11-16T09:00:00Z"))).toEqual([]); // сегодня понедельник, изменение «сегодняшнее»
+  });
+});
+
 describe("проверка даты из адреса", () => {
   it("принимает нормальную дату и отклоняет мусор", () => {
     const now = new Date("2026-11-12T12:00:00Z");

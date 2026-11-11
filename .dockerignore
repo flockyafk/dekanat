@@ -9,3 +9,8 @@ docs
 tests
 *.md
 .claude
+.next-*
+test-results
+playwright-report
+e2e
+redteam

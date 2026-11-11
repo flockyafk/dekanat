@@ -72,6 +72,20 @@ export async function getMyWeek(user: CurrentUser, monday: string) {
   return days.map((date, i) => ({ date, lessons: lessons[i] }));
 }
 
+/** Изменения в расписании на ближайшие дни после сегодняшнего (переносы, замены, отмены). */
+export async function getMyUpcomingChanges(user: CurrentUser, now: Date = new Date(), days = 3) {
+  const groupId = await myGroupId(user);
+  const today = dateKey(now);
+  const result: { date: string; lesson: LessonView }[] = [];
+  for (let i = 1; i <= days; i++) {
+    const date = addDays(today, i);
+    for (const lesson of await lessonsForGroup(groupId, date)) {
+      if (lesson.change) result.push({ date, lesson });
+    }
+  }
+  return result;
+}
+
 /** Следующая пара: сегодня после текущего момента, иначе в ближайшие 7 дней. */
 export async function getMyNextLesson(user: CurrentUser, now: Date = new Date()) {
   const today = dateKey(now);

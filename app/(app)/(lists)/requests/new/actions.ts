@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { REQUEST_TYPE_VALUES } from "@/lib/constants";
 import { createMyRequest } from "@/lib/data/requests";
+import { SITUATION_MAX, SITUATION_MIN, draftRequest } from "@/lib/ai";
 
 const schema = z.object({
   type: z.enum(REQUEST_TYPE_VALUES, { message: "Выберите вид заявки" }),
@@ -12,6 +13,27 @@ const schema = z.object({
 });
 
 export type RequestFormState = { error?: string; type?: string; text?: string };
+
+export type DraftActionResult = { ok: true; type: string; text: string } | { ok: false; text: string };
+
+/**
+ * Черновик заявки по описанию ситуации. Заявка НЕ создаётся: текст возвращается в форму,
+ * студент правит его и отправляет сам. Вызов идёт как серверное действие (POST), текст не попадает в адрес.
+ */
+export async function draftRequestAction(situation: string, selectedType: string): Promise<DraftActionResult> {
+  const user = await requireUser();
+  const parsed = z
+    .object({
+      situation: z.string().trim().min(SITUATION_MIN).max(SITUATION_MAX),
+      type: z.enum(REQUEST_TYPE_VALUES),
+    })
+    .safeParse({ situation, type: selectedType });
+  if (!parsed.success) {
+    return { ok: false, text: `Опишите ситуацию двумя фразами: от ${SITUATION_MIN} до ${SITUATION_MAX} символов.` };
+  }
+  const result = await draftRequest(user, parsed.data.situation, parsed.data.type);
+  return result.ok ? { ok: true, type: result.type, text: result.text } : { ok: false, text: result.text };
+}
 
 export async function createRequestAction(_prev: RequestFormState, formData: FormData): Promise<RequestFormState> {
   const user = await requireUser();
