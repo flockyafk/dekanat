@@ -17,6 +17,7 @@ export default defineConfig({
       AI_TIMEOUT_MS: "",
       AI_TOTAL_DAILY_LIMIT: "",
       AI_DAILY_LIMIT: "",
+      AI_RETRY_DELAY_MS: "10", // в тестах повтор через 10 мс, а не через 1,5 секунды
     },
   },
   resolve: {

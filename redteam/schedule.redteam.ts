@@ -71,6 +71,11 @@ describe.skipIf(!HAS_KEY)("расписание на реальной модел
         rows.push({ c, text: r.text, links: [], checks: [], ok: false, service: true });
         continue;
       }
+      // При сбое модели ответ о расписании теперь собирает код (source: "code"). Такой ответ не проверка модели: считаем сбоем модели.
+      if (r.source === "code") {
+        rows.push({ c, text: `(ответ из кода, модель не ответила) ${r.text}`, links: r.links.map((l) => l.href), checks: [], ok: false, service: true });
+        continue;
+      }
       const links = r.links.map((l) => l.href);
       const markers = await foreignMarkers(prisma, c.login);
       const leaked = markers.filter((m) => r.text.includes(m));

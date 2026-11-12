@@ -7,14 +7,15 @@ import { describeDate, resolveScheduleDates } from "@/lib/ai-schedule";
 import { getMyCourses, getMySession } from "@/lib/data/grades";
 import { getMyLatestAnnouncements } from "@/lib/data/notifications";
 import { getMyRequest, listMyRequests } from "@/lib/data/requests";
-import { WEEKDAYS_FULL, addDays, dateKey, isoWeek, weekdayOf } from "@/lib/time";
+import { getMyDeadlines } from "@/lib/data/deadlines";
+import { WEEKDAYS_FULL, addDays, dateKey, formatDateTimeRu, isoWeek, weekdayOf } from "@/lib/time";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
 /** Пара одной строкой: «10:40–12:10 Мировая экономика, лекция, ауд. 215, Крылов Д. С. ОТМЕНЕНА (причина)». */
 function lessonLine(l: LessonView): string {
-  const base = `${l.start}–${l.end} ${l.title}, ${l.kind}, ауд. ${l.room}, ${l.teacher}`;
+  const base = `${l.start}-${l.end} ${l.title}, ${l.kind}, ауд. ${l.room}, ${l.teacher}`; // диапазон времени через дефис, без длинного тире
   if (l.cancelled) return `${base}. ОТМЕНЕНА${l.change?.comment ? ` (${l.change.comment})` : ""}`;
   if (l.change) return `${base}. ${l.change.text}${l.change.comment ? ` (${l.change.comment})` : ""}`;
   return base;
@@ -62,19 +63,8 @@ export async function getAssistantContext(user: CurrentUser, now: Date = new Dat
     });
   }
 
-  // Дедлайны на 14 дней: по моим дисциплинам или по моей группе
-  const enrollments = await prisma.enrollment.findMany({ where: { studentId: user.id }, select: { courseId: true } });
-  const deadlines = await prisma.deadline.findMany({
-    where: {
-      dueAt: { gte: now, lte: new Date(now.getTime() + 14 * DAY_MS) },
-      OR: [
-        { courseId: { in: enrollments.map((e) => e.courseId) } },
-        ...(profile ? [{ groupId: profile.groupId }] : []),
-      ],
-    },
-    orderBy: { dueAt: "asc" },
-    include: { course: { select: { title: true } } },
-  });
+  // Дедлайны на 14 дней: по моей группе или по моим дисциплинам (правило в lib/data/deadlines.ts)
+  const deadlines = await getMyDeadlines(user, now, new Date(now.getTime() + 14 * DAY_MS));
 
   const requests = [];
   for (const r of requestList.slice(0, 10)) {
@@ -100,7 +90,8 @@ export async function getAssistantContext(user: CurrentUser, now: Date = new Dat
     deadlines: deadlines.map((d) => ({
       title: d.title,
       course: d.course?.title ?? null,
-      due: dateKey(d.dueAt),
+      due: dateKey(d.dueAt), // дата ГГГГ-ММ-ДД по Москве
+      dueText: formatDateTimeRu(d.dueAt), // «14 ноября в 18:00»: дату и время называть вместе
     })),
     courses: courses.map((c) => ({
       id: c.id,

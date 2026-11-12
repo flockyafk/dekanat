@@ -24,7 +24,7 @@ export default async function AssistantPage() {
           {mode === "ai" && "Ответы формирует ИИ и могут содержать ошибки: важные даты и время сверяйте с расписанием."}
           {mode === "unavailable" && "Сейчас помощник недоступен. Остальной кабинет работает."}
         </p>
-        <AskBox remaining={remaining} />
+        <AskBox userId={user.id} remaining={remaining} />
       </Card>
     </PageShell>
   );

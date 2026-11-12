@@ -1,12 +1,18 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { browserStorage, clearAllHistories } from "@/lib/chat-history";
 import { loginAction, type LoginState } from "./actions";
 
 const initial: LoginState = {};
 
 export function LoginForm() {
   const [state, action, pending] = useActionState(loginAction, initial);
+
+  // На странице входа в этом браузере не должно оставаться историй диалога прежних пользователей
+  useEffect(() => {
+    clearAllHistories(browserStorage());
+  }, []);
 
   return (
     <form action={action} className="space-y-4" noValidate>

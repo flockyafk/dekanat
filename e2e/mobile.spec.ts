@@ -9,6 +9,12 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 /** Нижнее меню телефона (в разметке есть ещё боковое, оно на телефоне скрыто). */
 const bottomNav = (page: Page) => page.locator("nav.fixed[aria-label='Основное меню']");
 
+/** Один клик по ссылке и проверка, что адрес сменился (без повторов: они маскировали настоящие дефекты). */
+async function clickUntilUrl(page: Page, click: () => Promise<void>, url: RegExp) {
+  await click();
+  await expect(page).toHaveURL(url, { timeout: 10_000 });
+}
+
 const SIGNATURE = "Концепт для MGIMO AI Challenge. Не официальный сервис вуза";
 
 async function login(browser: Browser, loginName: string, password: string) {
@@ -296,6 +302,136 @@ test.describe("три состояния: загрузка, пусто, ошиб
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole("heading", { name: "Сегодня", exact: true })).toBeVisible();
     await page.context().close();
+  });
+});
+
+test.describe("история диалога с помощником (только в браузере)", () => {
+  const dialogItems = (page: Page) => page.locator("main ul[aria-label='Диалог с помощником'] > li");
+  const Q1 = "Какие у меня долги?";
+  const Q2 = "Когда ближайший дедлайн?";
+
+  async function ask(page: Page, question: string, expectedItems: number) {
+    await page.fill("input[name=question]", question);
+    await page.click("button[type=submit]:has-text('Спросить')");
+    await expect(dialogItems(page)).toHaveCount(expectedItems, { timeout: 30_000 });
+  }
+
+  test("два вопроса подряд видны в /assistant и после перехода на другую страницу и обратно; на сервер уходит только текущий вопрос", async ({ browser }) => {
+    const page = await login(browser, "student1", "demo-student-1");
+    const bodies: string[] = [];
+    page.on("request", (r) => {
+      if (r.method() === "POST" && r.headers()["next-action"]) bodies.push(r.postData() ?? "");
+    });
+    await page.goto("/assistant");
+    await page.waitForLoadState("load");
+    await page.waitForTimeout(1500); // дать странице загрузить историю
+    await ask(page, Q1, 2);
+    await ask(page, Q2, 4);
+    await expect(dialogItems(page).nth(0)).toContainText(Q1);
+    await expect(dialogItems(page).nth(2)).toContainText(Q2);
+
+    // перешли на другую страницу и вернулись (по ссылке, без перезагрузки и с перезагрузкой): оба вопроса на месте
+    await page.goto("/grades");
+    await page.goto("/assistant");
+    await page.waitForTimeout(1500);
+    await expect(dialogItems(page)).toHaveCount(4);
+    await expect(dialogItems(page).nth(0)).toContainText(Q1);
+    await expect(dialogItems(page).nth(2)).toContainText(Q2);
+    await expectGood(page, 5, "/assistant (с историей)");
+
+    // на сервер каждый раз уходил только текущий вопрос, а не вся история
+    expect(bodies.length).toBeGreaterThanOrEqual(2);
+    expect(bodies.some((b) => b.includes(Q1))).toBe(true);
+    expect(bodies.find((b) => b.includes(Q2))).not.toContain(Q1);
+    await page.context().close();
+  });
+
+  test("на «Сегодня» последняя пара и «Полный диалог» ведёт к полной истории", async ({ browser }) => {
+    const page = await login(browser, "student1", "demo-student-1");
+    await page.waitForTimeout(1500);
+    await ask(page, Q1, 2);
+    await ask(page, Q2, 2); // на «Сегодня» показывается только последняя пара
+    await expect(dialogItems(page).nth(0)).toContainText(Q2);
+    await expect(dialogItems(page).filter({ hasText: Q1 })).toHaveCount(0); // первой пары на «Сегодня» нет (подсказки-чипы содержат тот же текст, поэтому смотрим на список диалога)
+    await clickUntilUrl(page, () => page.getByRole("link", { name: "Полный диалог" }).click(), /\/assistant$/);
+    await page.waitForTimeout(1500);
+    await expect(dialogItems(page)).toHaveCount(4); // в полном диалоге обе пары
+    // на «Сегодня» после возврата снова последняя пара
+    await page.goto("/");
+    await page.waitForTimeout(1500);
+    await expect(dialogItems(page)).toHaveCount(2);
+    await expect(dialogItems(page).nth(0)).toContainText(Q2);
+    await page.context().close();
+  });
+
+  test("«Очистить диалог» стирает историю и после перезагрузки её нет", async ({ browser }) => {
+    const page = await login(browser, "student1", "demo-student-1");
+    await page.goto("/assistant");
+    await page.waitForTimeout(1500);
+    await ask(page, Q1, 2);
+    const clear = page.getByRole("button", { name: "Очистить диалог" });
+    await expect(clear).toBeVisible();
+    expect((await clear.boundingBox())!.height).toBeGreaterThanOrEqual(43.5);
+    await clear.click();
+    await expect(dialogItems(page)).toHaveCount(0);
+    await expect(clear).toHaveCount(0);
+    await page.reload();
+    await page.waitForTimeout(1500);
+    await expect(dialogItems(page)).toHaveCount(0);
+    expect(await page.evaluate(() => Object.keys(sessionStorage).filter((k) => k.startsWith("dekanat:chat:")))).toEqual([]);
+    await page.context().close();
+  });
+
+  test("смена аккаунта в одном браузере: студент 2 не видит историю студента 1, выход стирает историю", async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width: 360, height: 740 }, hasTouch: true });
+    const page = await context.newPage();
+    const signIn = async (name: string, password: string) => {
+      await page.goto("/login");
+      await page.fill("#login", name);
+      await page.fill("#password", password);
+      await page.click("button[type=submit]");
+      await page.waitForURL((u) => u.pathname === "/");
+    };
+
+    await signIn("student1", "demo-student-1");
+    await page.goto("/assistant");
+    await page.waitForTimeout(1500);
+    await ask(page, Q1, 2);
+    const keyOfStudent1 = await page.evaluate(() => Object.keys(sessionStorage).filter((k) => k.startsWith("dekanat:chat:")));
+    expect(keyOfStudent1).toHaveLength(1);
+
+    // выход через меню: история стирается в этом браузере
+    await page.goto("/profile");
+    await bottomNav(page).getByText("Профиль", { exact: true }).waitFor();
+    await page.getByRole("button", { name: "Выйти" }).click();
+    await expect(page).toHaveURL(/\/login$/);
+    expect(await page.evaluate(() => Object.keys(sessionStorage).filter((k) => k.startsWith("dekanat:chat:")))).toEqual([]);
+
+    // студент 2 в том же браузере: истории студента 1 нет
+    await signIn("student2", "demo-student-2");
+    await page.goto("/assistant");
+    await page.waitForTimeout(1500);
+    await expect(dialogItems(page)).toHaveCount(0);
+    await expect(dialogItems(page).filter({ hasText: Q1 })).toHaveCount(0);
+
+    // даже если выход не произошёл (сессия закончилась), чужую историю не покажут: ключ привязан к пользователю
+    await page.evaluate((key) => sessionStorage.setItem(key, JSON.stringify([{ id: 1, role: "user", text: "Вопрос студента 1" }])), keyOfStudent1[0]);
+    await page.reload();
+    await page.waitForTimeout(1500);
+    await expect(dialogItems(page)).toHaveCount(0);
+    await expect(dialogItems(page).filter({ hasText: "Вопрос студента 1" })).toHaveCount(0);
+    await context.close();
+  });
+
+  test("страница входа стирает истории прежних пользователей в этом браузере", async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width: 360, height: 740 }, hasTouch: true });
+    const page = await context.newPage();
+    await page.goto("/login");
+    await page.evaluate(() => sessionStorage.setItem("dekanat:chat:кто-то", JSON.stringify([{ id: 1, role: "user", text: "Старый вопрос" }])));
+    await page.reload();
+    await page.waitForTimeout(1000);
+    expect(await page.evaluate(() => Object.keys(sessionStorage).filter((k) => k.startsWith("dekanat:chat:")))).toEqual([]);
+    await context.close();
   });
 });
 

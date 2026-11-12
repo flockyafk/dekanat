@@ -1,14 +1,18 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import bcrypt from "bcryptjs";
 
 process.env.DATABASE_URL = "file:../data/test.db";
 
 const { prisma } = await import("@/lib/db");
 const { getTodayData } = await import("@/lib/data/today");
+const { getMyDeadlines } = await import("@/lib/data/deadlines");
 const { getMyLessonsOn } = await import("@/lib/data/schedule");
 const { getMyUnreadCount } = await import("@/lib/data/notifications");
 const { changeMyPassword } = await import("@/lib/data/profile");
 const { dateKey, dayStart, weekParityOf, weekdayOf, addDays } = await import("@/lib/time");
+
+// Среда 12 ноября 2026: дедлайны и экзамены в сиде заданы фиксированными датами, поэтому тесты идут на фиксированный «сегодня»
+const NOW = new Date("2026-11-12T09:00:00Z");
 
 async function userOf(login: string) {
   const u = await prisma.user.findUniqueOrThrow({ where: { login } });
@@ -38,9 +42,9 @@ describe("экран «Сегодня»: данные только своего 
   });
 
   it("ближайший экзамен и долги на «Сегодня» принадлежат своему студенту", async () => {
-    const s1 = await getTodayData(await userOf("student1"));
-    const s2 = await getTodayData(await userOf("student2"));
-    const s3 = await getTodayData(await userOf("student3"));
+    const s1 = await getTodayData(await userOf("student1"), NOW);
+    const s2 = await getTodayData(await userOf("student2"), NOW);
+    const s3 = await getTodayData(await userOf("student3"), NOW);
     expect(s1.summary.exam?.title).toBe("Деловой английский");
     expect(s2.summary.exam?.title).toBe("Теория международных отношений");
     expect(s3.summary.exam?.title).toBe("Статистика");
@@ -48,12 +52,18 @@ describe("экран «Сегодня»: данные только своего 
   });
 
   it("дедлайны и заявки не попадают к чужому студенту", async () => {
-    const s1 = await getTodayData(await userOf("student1"));
-    const s2 = await getTodayData(await userOf("student2"));
-    const s3 = await getTodayData(await userOf("student3"));
+    const s1 = await getTodayData(await userOf("student1"), NOW);
+    const s2 = await getTodayData(await userOf("student2"), NOW);
+    const s3 = await getTodayData(await userOf("student3"), NOW);
     expect(s1.deadlines.map((d) => d.title)).toContain("Сдать эссе по ТМО");
     expect(s3.deadlines.map((d) => d.title)).not.toContain("Сдать эссе по ТМО");
     expect(s1.deadlines.map((d) => d.title)).not.toContain("Лабораторная 2 по статистике");
+    // «Тест по деловому английскому» (18 ноября) это дедлайн ГРУППЫ 1 по дисциплине, на которую записан и студент 3 (группа 2):
+    // студент 3 его видеть не должен
+    const wide = await getMyDeadlines(await userOf("student3"), NOW, new Date("2026-11-30T00:00:00Z"));
+    expect(wide.map((d) => d.title)).toContain("Презентация на английском");
+    expect(wide.map((d) => d.title)).not.toContain("Тест по деловому английскому");
+    expect(wide.map((d) => d.title)).not.toContain("Реферат по мировой экономике");
     // заявка студента 1 «в работе» видна только ему
     expect(s1.requests.map((r) => r.type)).toContain("Справка об обучении");
     expect(s2.deadlines.map((d) => d.title)).toContain("Сдать эссе по ТМО"); // та же группа, что у студента 1
@@ -71,6 +81,10 @@ describe("экран «Сегодня»: данные только своего 
 });
 
 describe("расписание и уведомления", () => {
+  beforeAll(async () => {
+    await prisma.lessonChange.deleteMany(); // демо-переносы сида лежат и на этих датах
+  });
+
   const monday = "2026-11-16";
   const change = { id: "" };
   afterAll(async () => {

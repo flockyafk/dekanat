@@ -152,7 +152,7 @@ export default async function TodayPage() {
       </Card>
 
       <Card title="Спроси деканат" id="ask">
-        <AskBox compact remaining={remaining} />
+        <AskBox userId={user.id} compact remaining={remaining} />
       </Card>
     </PageShell>
   );

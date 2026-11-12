@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { navItemsFor, type NavItem } from "@/lib/nav";
-import { logoutAction } from "@/app/login/actions";
+import { LogoutButton } from "@/components/logout-button";
 
 type Role = "student" | "staff";
 
@@ -29,11 +29,7 @@ function NavEntry({ item, active, variant }: { item: NavItem; active: boolean; v
 
   if (item.action === "logout") {
     return (
-      <form action={logoutAction}>
-        <button type="submit" className={cls}>
-          {content}
-        </button>
-      </form>
+      <LogoutButton className={cls}>{content}</LogoutButton>
     );
   }
   return (

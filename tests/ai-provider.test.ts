@@ -101,7 +101,7 @@ describe("провайдер Amvera (формат OpenAI chat/completions): за
   it("небезопасный адрес (не HTTPS) не используется: ключ не отправляется по открытому каналу", async () => {
     useAmvera({ AI_BASE_URL: "http://evil.example/v1" });
     stubFetch(() => okResponse("не должно вызываться"));
-    const r = await askAssistant(await userOf("student1"), "Что у меня завтра?");
+    const r = await askAssistant(await userOf("student1"), "Какие у меня долги?");
     expect(r).toMatchObject({ ok: false, reason: "unavailable" });
     expect(calls).toHaveLength(0);
   });
@@ -117,7 +117,7 @@ describe("провайдер Amvera (формат OpenAI chat/completions): за
     useAmvera();
     delete process.env.AI_API_KEY;
     stubFetch(() => okResponse("не должно вызываться"));
-    const r = await askAssistant(await userOf("student1"), "Что у меня завтра?");
+    const r = await askAssistant(await userOf("student1"), "Какие у меня долги?");
     expect(r).toMatchObject({ ok: false, reason: "unavailable" });
     expect(calls).toHaveLength(0);
     expect(await prisma.aiUsage.count()).toBe(0);
@@ -143,7 +143,7 @@ describe("провайдер Amvera: ответ и ошибки", () => {
       const spies = (["log", "info", "warn", "error", "debug"] as const).map((m) => vi.spyOn(console, m).mockImplementation(() => {}));
       try {
         const s1 = await userOf("student1");
-        const r = await askAssistant(s1, "Что у меня завтра?");
+        const r = await askAssistant(s1, "Какие у меня долги?");
         expect(r).toMatchObject({ ok: false, reason: "unavailable" });
         expect(r.text).toContain("Остальной кабинет работает");
         expect(JSON.stringify(r)).not.toContain(FAKE_KEY);
@@ -162,9 +162,9 @@ describe("провайдер Amvera: ответ и ошибки", () => {
     stubFetch(() => {
       throw new TypeError("fetch failed");
     });
-    expect(await askAssistant(await userOf("student1"), "Что у меня завтра?")).toMatchObject({ ok: false, reason: "unavailable" });
+    expect(await askAssistant(await userOf("student1"), "Какие у меня долги?")).toMatchObject({ ok: false, reason: "unavailable" });
     stubFetch(() => new Response(JSON.stringify({ choices: [] }), { status: 200 }));
-    expect(await askAssistant(await userOf("student1"), "Что у меня завтра?")).toMatchObject({ ok: false, reason: "unavailable" });
+    expect(await askAssistant(await userOf("student1"), "Какие у меня долги?")).toMatchObject({ ok: false, reason: "unavailable" });
   });
 
   it("таймаут обрывает запрос и не возвращает запрос в лимит", async () => {
@@ -183,7 +183,7 @@ describe("провайдер Amvera: ответ и ошибки", () => {
     );
     const s2 = await userOf("student2");
     const started = Date.now();
-    const r = await askAssistant(s2, "Что у меня завтра?");
+    const r = await askAssistant(s2, "Какие у меня долги?");
     expect(r).toMatchObject({ ok: false, reason: "unavailable" });
     expect(aborted).toBe(true);
     expect(Date.now() - started).toBeLessThan(3000);

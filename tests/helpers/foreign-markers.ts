@@ -37,8 +37,14 @@ export async function foreignMarkers(prisma: PrismaClient, login: string): Promi
   for (const g of await prisma.grade.findMany({ where: { courseId: { notIn: myCourseIds }, studentId: { not: me.id } } })) {
     markers.push(g.title);
   }
+  // Чужой дедлайн: у него есть группа, и это не моя (даже по общей дисциплине), либо группы нет и дисциплина не моя
   const foreignDeadlines = await prisma.deadline.findMany({
-    where: { NOT: { OR: [{ courseId: { in: myCourseIds } }, { groupId: myProfile.groupId }] } },
+    where: {
+      OR: [
+        { groupId: { not: myProfile.groupId } }, // не пустая и не моя группа
+        { groupId: null, courseId: { notIn: myCourseIds } },
+      ],
+    },
   });
   for (const d of foreignDeadlines) markers.push(d.id, d.title);
 

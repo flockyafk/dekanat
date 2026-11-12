@@ -117,8 +117,8 @@ describe("модель получает готовый список пар, по
     expect(ctx.scheduleAnswer).toHaveLength(1);
     const text: string = ctx.scheduleAnswer[0].text;
     expect(text).toContain("Пары на понедельник, 16 ноября (верхняя неделя)");
-    expect(text).toContain("1) 09:00–10:30 Теория международных отношений, лекция, ауд. 301");
-    expect(text).toContain("2) 10:40–12:10 Деловой английский, семинар, ауд. 412");
+    expect(text).toContain("1) 09:00-10:30 Теория международных отношений, лекция, ауд. 301");
+    expect(text).toContain("2) 10:40-12:10 Деловой английский, семинар, ауд. 412");
     expect(text).not.toContain("пар нет");
   });
 

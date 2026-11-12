@@ -1,36 +1,56 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { askAction, type AskResult } from "@/app/(app)/(lists)/assistant/actions";
-
-type Message = {
-  id: number;
-  role: "user" | "assistant";
-  text: string;
-  links?: { href: string; label: string }[];
-  error?: boolean;
-};
+import { browserStorage, clearHistory, loadHistory, saveHistory, type ChatMessage } from "@/lib/chat-history";
 
 const EXAMPLES = ["Что у меня завтра?", "Какие у меня долги?", "Когда ближайший дедлайн?", "В каком статусе моя справка?"];
 
 /**
  * Поле «Спроси деканат». Вопрос уходит серверным действием (POST), в адрес страницы не попадает.
- * compact: на экране «Сегодня» показывается только последний ответ и ссылка на полный диалог.
- * Ответ показывается как обычный текст, ссылки уже проверены на сервере.
+ * История диалога хранится ТОЛЬКО в браузере (sessionStorage, ключ с id пользователя, последние 10 пар вопрос-ответ):
+ * на сервер и в журнал она не отправляется. Стирается при выходе из аккаунта и кнопкой «Очистить диалог».
+ * compact: на экране «Сегодня» показывается последняя пара и ссылка на полный диалог (/assistant).
+ * Ответ показывается как обычный текст, ссылки уже проверены на сервере (и при чтении истории проверяются заново).
  */
-export function AskBox({ compact = false, remaining: initialRemaining }: { compact?: boolean; remaining?: number }) {
+export function AskBox({
+  userId,
+  compact = false,
+  remaining: initialRemaining,
+}: {
+  userId: string;
+  compact?: boolean;
+  remaining?: number;
+}) {
   const inputId = useId();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [hydrated, setHydrated] = useState(false); // история из браузера уже прочитана
   const [remaining, setRemaining] = useState<number | undefined>(initialRemaining);
   const [pending, startTransition] = useTransition();
   const [value, setValue] = useState("");
+  const nextId = useRef(1);
+
+  // Чтение истории после показа страницы (на сервере sessionStorage нет). Ключ зависит от пользователя.
+  useEffect(() => {
+    const loaded = loadHistory(browserStorage(), userId);
+    nextId.current = loaded.reduce((max, m) => Math.max(max, m.id), 0) + 1;
+    setMessages(loaded);
+    setHydrated(true);
+  }, [userId]);
+
+  // Сохранение после каждого изменения, но только когда чтение уже произошло (иначе затёрли бы сохранённое пустым)
+  useEffect(() => {
+    if (hydrated) saveHistory(browserStorage(), userId, messages);
+  }, [messages, hydrated, userId]);
+
+  const newId = () => nextId.current++;
 
   function send(question: string) {
     const q = question.trim();
     if (!q || pending) return;
     setValue("");
-    setMessages((m) => [...m, { id: m.length * 2, role: "user", text: q }]);
+    setMessages((m) => [...m, { id: newId(), role: "user", text: q }]);
     startTransition(async () => {
       let res: AskResult;
       try {
@@ -38,7 +58,12 @@ export function AskBox({ compact = false, remaining: initialRemaining }: { compa
       } catch {
         setMessages((m) => [
           ...m,
-          { id: m.length * 2 + 1, role: "assistant", error: true, text: "Не получилось связаться с помощником. Остальной кабинет работает, попробуйте позже." },
+          {
+            id: newId(),
+            role: "assistant",
+            error: true,
+            text: "Не получилось связаться с помощником. Остальной кабинет работает, попробуйте позже.",
+          },
         ]);
         return;
       }
@@ -46,7 +71,7 @@ export function AskBox({ compact = false, remaining: initialRemaining }: { compa
       setMessages((m) => [
         ...m,
         {
-          id: m.length * 2 + 1,
+          id: newId(),
           role: "assistant",
           text: res.answer.text,
           links: res.answer.ok ? res.answer.links : undefined,
@@ -56,12 +81,17 @@ export function AskBox({ compact = false, remaining: initialRemaining }: { compa
     });
   }
 
+  function clearDialog() {
+    clearHistory(browserStorage(), userId);
+    setMessages([]);
+  }
+
   const shown = compact ? messages.slice(-2) : messages;
 
   return (
     <div>
       {shown.length > 0 && (
-        <ul className="mb-3 space-y-2" aria-live="polite">
+        <ul className="mb-3 space-y-2" aria-live="polite" aria-label="Диалог с помощником">
           {shown.map((m) => (
             <li
               key={m.id}
@@ -138,7 +168,15 @@ export function AskBox({ compact = false, remaining: initialRemaining }: { compa
             Полный диалог
           </Link>
         )}
+        {!compact && messages.length > 0 && (
+          <button type="button" onClick={clearDialog} className="min-h-11 rounded-md border border-line px-3 text-foreground">
+            Очистить диалог
+          </button>
+        )}
       </p>
+      {!compact && (
+        <p className="text-xs text-muted">Диалог хранится только в этом браузере и стирается при выходе из аккаунта.</p>
+      )}
     </div>
   );
 }

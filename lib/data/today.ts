@@ -5,16 +5,12 @@ import { dateKey } from "@/lib/time";
 import { getMyLessonsOn, getMyNextLesson, getMyUpcomingChanges } from "@/lib/data/schedule";
 import { getMyLatestAnnouncements } from "@/lib/data/notifications";
 import { getMyStanding } from "@/lib/data/grades";
+import { getMyDeadlines } from "@/lib/data/deadlines";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Всё для экрана «Сегодня». Каждый запрос фильтруется по пользователю из сессии. */
 export async function getTodayData(user: CurrentUser, now: Date = new Date()) {
-  const profile = await prisma.studentProfile.findUnique({
-    where: { userId: user.id },
-    select: { groupId: true },
-  });
-
   const [lessonsToday, next, announcements, upcomingChanges] = await Promise.all([
     getMyLessonsOn(user, dateKey(now)),
     getMyNextLesson(user, now),
@@ -23,22 +19,8 @@ export async function getTodayData(user: CurrentUser, now: Date = new Date()) {
   ]);
   const changes = lessonsToday.filter((l) => l.change);
 
-  // Дедлайны на 7 дней: по моим дисциплинам или по моей группе
-  const enrollments = await prisma.enrollment.findMany({
-    where: { studentId: user.id },
-    select: { courseId: true },
-  });
-  const deadlines = await prisma.deadline.findMany({
-    where: {
-      dueAt: { gte: now, lte: new Date(now.getTime() + 7 * DAY_MS) },
-      OR: [
-        { courseId: { in: enrollments.map((e) => e.courseId) } },
-        ...(profile ? [{ groupId: profile.groupId }] : []),
-      ],
-    },
-    orderBy: { dueAt: "asc" },
-    include: { course: { select: { title: true } } },
-  });
+  // Дедлайны на 7 дней: по моей группе или по моим дисциплинам (правило в lib/data/deadlines.ts)
+  const deadlines = await getMyDeadlines(user, now, new Date(now.getTime() + 7 * DAY_MS));
 
   // Заявки, у которых статус сменился за последние 7 дней
   const requests = await prisma.request.findMany({

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getMyProfile } from "@/lib/data/profile";
 import { Card, PageShell } from "@/components/ui";
-import { logoutAction } from "@/app/login/actions";
+import { LogoutButton } from "@/components/logout-button";
 import { PasswordForm } from "./password-form";
 
 export const metadata = { title: "Профиль — Мой деканат" };
@@ -47,11 +47,7 @@ export default async function ProfilePage() {
       <Card title="Смена пароля" id="pwd">
         <PasswordForm />
       </Card>
-      <form action={logoutAction}>
-        <button type="submit" className="h-11 w-full rounded-md border border-line bg-surface font-medium">
-          Выйти
-        </button>
-      </form>
+      <LogoutButton className="h-11 w-full rounded-md border border-line bg-surface font-medium">Выйти</LogoutButton>
     </PageShell>
   );
 }

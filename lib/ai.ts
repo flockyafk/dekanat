@@ -11,6 +11,7 @@ import {
 } from "@/lib/data/assistant";
 import { withUserLock } from "@/lib/lock";
 import { resolveScheduleDates } from "@/lib/ai-schedule";
+import { countAiRequest, logAiError, logAiFallback, logAiRecovered } from "@/lib/ai-stats";
 import { isKnownRoute } from "@/lib/routes";
 import { dateKey } from "@/lib/time";
 
@@ -44,7 +45,7 @@ export function renderUserMessage(req: ProviderRequest): string {
 
 export type AssistantLink = { href: string; label: string };
 export type AssistantAnswer =
-  | { ok: true; text: string; links: AssistantLink[] }
+  | { ok: true; text: string; links: AssistantLink[]; source?: "model" | "code" }
   | { ok: false; reason: "limit" | "unavailable" | "invalid" | "forbidden"; text: string };
 
 const MSG = {
@@ -188,13 +189,44 @@ export async function askAssistant(user: CurrentUser, rawQuestion: string, now: 
     const context = await getAssistantContext(user, now, question);
     return { request: buildProviderRequest(SYSTEM_PROMPT, context, question), context };
   });
-  if (!outcome.ok) return outcome;
+  if (!outcome.ok) {
+    // Модель не ответила (402, таймаут, сеть, нет ключа). Вопросы о расписании на день недели, дату, «сегодня» и «завтра»
+    // код считает сам, поэтому отвечаем из кода без модели. «Помощник недоступен» остаётся только там, где без модели не ответить.
+    if (outcome.reason === "unavailable") {
+      const fromCode = await scheduleAnswerFromCode(user, question, now);
+      if (fromCode) {
+        logAiFallback(outcome.lastStatus ?? "unavailable");
+        return fromCode;
+      }
+    }
+    return { ok: false, reason: outcome.reason, text: outcome.text };
+  }
   const answer = sanitizeAnswer(outcome.raw, outcome.context);
   // Если модель забыла ссылку на раздел, добавляем её по теме вопроса (только из списка маршрутов, только свои id)
   if (answer.links.length === 0 && !/^(В данных этого нет|Я показываю только ваши данные)/.test(answer.text)) {
     answer.links = fallbackLinks(question, outcome.context);
   }
-  return { ok: true, ...answer };
+  return { ok: true, ...answer, source: "model" };
+}
+
+/**
+ * Готовый ответ о расписании без модели: «Пары на <дата> (<неделя>): …» из того же списка, который в обычном случае
+ * получает модель. Возвращает null, если вопрос не про расписание на конкретную дату (тогда без модели не ответить).
+ */
+async function scheduleAnswerFromCode(user: CurrentUser, question: string, now: Date): Promise<AssistantAnswer | null> {
+  try {
+    const ctx = await getAssistantContext(user, now, question);
+    if (ctx.scheduleAnswer.length === 0) return null;
+    const text = normalizeDashes(ctx.scheduleAnswer.map((a) => a.text).join("\n"));
+    return {
+      ok: true,
+      text,
+      links: [{ href: `/schedule?d=${ctx.scheduleAnswer[0].date}&v=day`, label: "Расписание" }],
+      source: "code",
+    };
+  } catch {
+    return null; // не получилось собрать и это: честное «недоступен»
+  }
 }
 
 /** Ссылки на разделы по теме вопроса. Страховка на случай, когда модель не поставила ссылку сама. */
@@ -254,7 +286,9 @@ export async function draftRequest(
   return { ok: true, ...sanitizeDraft(outcome.raw, selectedType) };
 }
 
-type CallOutcome<C> = { ok: true; raw: string; context: C } | { ok: false; reason: "limit" | "unavailable"; text: string };
+type CallOutcome<C> =
+  | { ok: true; raw: string; context: C }
+  | { ok: false; reason: "limit" | "unavailable"; text: string; lastStatus?: string };
 
 /**
  * Общий путь любого вызова модели: провайдер, резерв в суточном лимите (на студента и общий),
@@ -285,32 +319,76 @@ async function callModel<C>(
   if (reserved === "limit") return { ok: false, reason: "limit", text: MSG.limit };
   if (reserved === "global") return { ok: false, reason: "limit", text: MSG.globalLimit };
 
+  countAiRequest();
   let called = false;
+  let anyTimeout = false; // был ли таймаут: тогда провайдер мог выполнить запрос и списать токены
+  let lastError: unknown;
+  let lastStatus: string | undefined;
   try {
     const { request, context } = await build();
     called = true;
-    const raw = await withTimeout(provider.complete(request), timeoutMs() + 500);
-    return { ok: true, raw, context };
-  } catch (e) {
-    // Запрос возвращается в лимит только если токены точно не потрачены: ошибка до обращения к провайдеру,
-    // отказ провайдера со статусом 4xx/5xx или сеть недоступна. Таймаут, пустой или битый ответ запрос НЕ возвращают:
-    // провайдер мог выполнить его и списать токены, иначе лимит можно было бы обойти.
-    // Текст вопроса, ответ и ошибка провайдера не пишутся в журнал.
-    const refundable = !called || (e instanceof ProviderError && e.status >= 400) || e instanceof TypeError;
-    if (refundable) {
-      await withUserLock("ai:reserve", () =>
-        prisma.aiUsage.updateMany({
-          where: { userId: user.id, date: day, count: { gt: 0 } },
-          data: { count: { decrement: 1 } },
-        }),
-      );
+    // Одна повторная попытка через 1-2 секунды, только при 402, 429, 5xx и таймауте (нерегулярные 402 «Billing pre-check
+    // failed» у провайдера проходят со второго раза). При 400, 401, 403 и остальных не повторяем.
+    // Повтор НЕ резервирует суточный лимит заново: запрос студента уже учтён один раз выше.
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const started = Date.now();
+      try {
+        const raw = await withTimeout(provider.complete(request), timeoutMs() + 500);
+        if (attempt === 2) logAiRecovered(lastStatus ?? "unknown", Date.now() - started);
+        return { ok: true, raw, context };
+      } catch (e) {
+        lastError = e;
+        lastStatus = errorKind(e);
+        if (lastStatus === "timeout") anyTimeout = true;
+        const willRetry = attempt === 1 && isRetryable(e);
+        logAiError(lastStatus, attempt, Date.now() - started, willRetry);
+        if (!willRetry) break;
+        await new Promise((r) => setTimeout(r, retryDelayMs()));
+      }
     }
-    return { ok: false, reason: "unavailable", text: MSG.unavailable };
+  } catch (e) {
+    lastError = e; // ошибка до обращения к провайдеру (сбор данных)
+    lastStatus = "build";
   }
+
+  // Запрос возвращается в лимит только если токены точно не потрачены: ошибка до обращения к провайдеру,
+  // отказ провайдера со статусом 4xx/5xx или сеть недоступна. Таймаут (в любой из попыток), пустой или битый ответ
+  // запрос НЕ возвращают: провайдер мог выполнить его и списать токены, иначе лимит можно было бы обойти.
+  // Текст вопроса, ответ и ошибка провайдера не пишутся в журнал.
+  const refundable =
+    !called || (!anyTimeout && ((lastError instanceof ProviderError && lastError.status >= 400) || lastError instanceof TypeError));
+  if (refundable) {
+    await withUserLock("ai:reserve", () =>
+      prisma.aiUsage.updateMany({
+        where: { userId: user.id, date: day, count: { gt: 0 } },
+        data: { count: { decrement: 1 } },
+      }),
+    );
+  }
+  return { ok: false, reason: "unavailable", text: MSG.unavailable, lastStatus };
+}
+
+/** Вид ошибки для счётчика и журнала: код статуса, timeout, network, empty или other. Без текста ошибки. */
+function errorKind(e: unknown): string {
+  if (e instanceof ProviderError) return e.status === 0 ? "empty" : String(e.status);
+  if ((e as Error)?.message === "timeout") return "timeout";
+  if (e instanceof TypeError) return "network";
+  return "other";
+}
+
+/** Повторяем при 402, 429, 5xx и таймауте. Не повторяем при 400, 401, 403, пустом ответе и сетевой ошибке. */
+function isRetryable(e: unknown): boolean {
+  if (e instanceof ProviderError) return e.status === 402 || e.status === 429 || e.status >= 500;
+  return (e as Error)?.message === "timeout";
+}
+
+function retryDelayMs(): number {
+  const n = Number(process.env.AI_RETRY_DELAY_MS);
+  return Number.isFinite(n) && n >= 0 && process.env.AI_RETRY_DELAY_MS !== "" ? Math.min(n, 5000) : 1500;
 }
 
 function timeoutMs(): number {
-  return Number(process.env.AI_TIMEOUT_MS) || 30_000;
+  return Number(process.env.AI_TIMEOUT_MS) || 20_000; // на одну попытку; две попытки и пауза до 42 с
 }
 
 /**
@@ -342,7 +420,7 @@ export function sanitizeDraft(raw: string, selectedType: string): { type: string
     .replace(/\n{3,}/g, "\n\n")
     .trim()
     .slice(0, 1000);
-  return { type, text: body || "Не удалось составить заявление по этому описанию. Опишите, что вам нужно от деканата." };
+  return { type, text: normalizeDashes(body) || "Не удалось составить заявление по этому описанию. Опишите, что вам нужно от деканата." };
 }
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
@@ -362,6 +440,16 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 }
 
 // ---------- Очистка ответа модели ----------
+
+/**
+ * Длинное тире в ответах не нужно: между словами ставим запятую, в диапазонах дефис (09:00-10:30).
+ */
+export function normalizeDashes(text: string): string {
+  return text
+    .replace(/(\d)\s*[–—―]\s*(\d)/g, "$1-$2") // диапазоны: 10:40–12:10 -> 10:40-12:10
+    .replace(/\s+[—―–]\s+/g, ", ") // между словами: запятая
+    .replace(/[—―–]/g, "-"); // остальное: обычный дефис
+}
 
 const LINK_MARK = /\[\[([^\]|]{1,200})\|([^\]]{1,60})\]\]/g;
 
@@ -399,7 +487,7 @@ export function sanitizeAnswer(raw: string, ctx: AssistantContext): { text: stri
     .replace(/\n{3,}/g, "\n\n")
     .trim()
     .slice(0, 2000);
-  return { text: text || "В данных этого нет.", links };
+  return { text: normalizeDashes(text) || "В данных этого нет.", links };
 }
 
 // ---------- Заглушка: готовые ответы по данным ----------
@@ -449,7 +537,7 @@ export function stubAnswer(ctx: AssistantContext, question: string): string {
 
   if (/дедлайн|срок|сдать|сдачи/.test(q)) {
     if (ctx.deadlines.length === 0) return "Ближайших дедлайнов на две недели вперёд нет.\n[[/|Сегодня]]";
-    const lines = ctx.deadlines.map((d) => `${d.due}: ${d.title}`);
+    const lines = ctx.deadlines.map((d) => `${d.dueText}: ${d.title}`);
     return `Ближайшие дедлайны:\n${lines.join("\n")}\n[[/|Сегодня]]`;
   }
 

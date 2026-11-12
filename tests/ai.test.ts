@@ -337,7 +337,7 @@ describe("лимит запросов, недоступность, журнал"
   it("если ИИ недоступен, студент видит понятное сообщение и запрос не списывается", async () => {
     setAiProviderForTests(null);
     const s1 = await userOf("student1");
-    const r = await askAssistant(s1, "Что у меня завтра?");
+    const r = await askAssistant(s1, "Какие у меня долги?");
     expect(r).toMatchObject({ ok: false, reason: "unavailable" });
     expect(r.text).toContain("Остальной кабинет работает");
     expect(await prisma.aiUsage.count({ where: { userId: s1.id } })).toBe(0);
@@ -348,7 +348,7 @@ describe("лимит запросов, недоступность, журнал"
     try {
       setAiProviderForTests({ name: "slow", complete: () => new Promise<string>(() => {}) });
       const s2 = await userOf("student2");
-      const r = await askAssistant(s2, "Что у меня завтра?");
+      const r = await askAssistant(s2, "Какие у меня долги?");
       expect(r).toMatchObject({ ok: false, reason: "unavailable" });
       const row = await prisma.aiUsage.findUniqueOrThrow({ where: { userId_date: { userId: s2.id, date: dateKey() } } });
       expect(row.count).toBe(1);
@@ -366,7 +366,7 @@ describe("лимит запросов, недоступность, журнал"
       },
     });
     const s2 = await userOf("student2");
-    expect(await askAssistant(s2, "Что у меня завтра?")).toMatchObject({ ok: false, reason: "unavailable" });
+    expect(await askAssistant(s2, "Какие у меня долги?")).toMatchObject({ ok: false, reason: "unavailable" });
     const row = await prisma.aiUsage.findUniqueOrThrow({ where: { userId_date: { userId: s2.id, date: dateKey() } } });
     expect(row.count).toBe(1);
   });
@@ -380,7 +380,7 @@ describe("лимит запросов, недоступность, журнал"
       },
     });
     const s1 = await userOf("student1");
-    const r = await askAssistant(s1, "Что у меня завтра?");
+    const r = await askAssistant(s1, "Какие у меня долги?");
     expect(r).toMatchObject({ ok: false, reason: "unavailable" });
     const row = await prisma.aiUsage.findUnique({ where: { userId_date: { userId: s1.id, date: dateKey() } } });
     expect(row?.count ?? 0).toBe(0);
@@ -390,7 +390,7 @@ describe("лимит запросов, недоступность, журнал"
     setAiProviderForTests(undefined);
     process.env.AI_PROVIDER = "some-real-provider";
     try {
-      const r = await askAssistant(await userOf("student1"), "Что у меня завтра?");
+      const r = await askAssistant(await userOf("student1"), "Какие у меня долги?");
       expect(r).toMatchObject({ ok: false, reason: "unavailable" });
     } finally {
       delete process.env.AI_PROVIDER;

@@ -4,12 +4,11 @@ import bcrypt from "bcryptjs";
 import { refreshDemoDates } from "./refresh-demo";
 
 const prisma = new PrismaClient();
-const day = (offset: number, h = 0) => {
-  const d = new Date();
-  d.setHours(h, 0, 0, 0);
-  d.setDate(d.getDate() + offset);
-  return d;
-};
+// Даты сида ФИКСИРОВАННЫЕ: отсчёт от 11 ноября 2026 (12:00 по Москве), а не от дня заполнения базы.
+// Так оценки, экзамены и результаты не «плывут» и одинаковы при любом деплое. Дедлайны и переносы пар лежат
+// в prisma/refresh-demo.ts и тоже заданы календарными датами.
+const SEED_BASE = new Date("2026-11-11T09:00:00Z");
+const day = (offset: number) => new Date(SEED_BASE.getTime() + offset * 24 * 60 * 60 * 1000);
 
 async function main() {
   // Сид стирает все таблицы. При SEED_ONLY_IF_EMPTY=1 (его ставит docker-entrypoint.sh)
@@ -171,8 +170,8 @@ async function main() {
       { audience: "all", kind: "объявление", title: "Приём справок в пятницу", body: "Деканат принимает заявки до 16:00.", link: "/requests" },
       { audience: "group", groupId: g1.id, kind: "расписание", title: "Перенос пары", body: "Семинар по ТМО в среду перенесён.", link: "/schedule" },
       { audience: "student", studentId: s1.id, kind: "заявка", title: "Заявка в работе", body: "Справка об обучении принята в работу.", link: `/requests/${r1.id}` },
-      { audience: "group", groupId: g1.id, kind: "дедлайн", title: "Эссе по ТМО", body: "Эссе нужно сдать в течение трёх дней.", link: "/grades" },
-      { audience: "group", groupId: g2.id, kind: "дедлайн", title: "Лабораторная 2 по статистике", body: "Сдача лабораторной через пять дней.", link: "/grades" },
+      { audience: "group", groupId: g1.id, kind: "дедлайн", title: "Эссе по ТМО", body: "Срок сдачи эссе: 14 ноября, 18:00.", link: "/grades" },
+      { audience: "group", groupId: g2.id, kind: "дедлайн", title: "Лабораторная 2 по статистике", body: "Срок сдачи лабораторной: 16 ноября, 18:00.", link: "/grades" },
     ],
   });
 
