@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 export function PageShell({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <main className="mx-auto w-full max-w-xl flex-1 px-4 py-6">
+    <main id="content" tabIndex={-1} className="mx-auto w-full max-w-xl flex-1 px-4 py-6 outline-none">
       <h1 className="mb-4 text-2xl font-semibold">{title}</h1>
       <div className="space-y-4">{children}</div>
     </main>

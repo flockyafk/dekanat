@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { STAFF_STATUSES } from "@/lib/constants";
 import { changeStatusAction, publishAnnouncementAction, type StaffFormState } from "./actions";
 
@@ -24,7 +24,6 @@ function Message({ state }: { state: StaffFormState }) {
 
 export function StatusForm({ requestId, current }: { requestId: string; current: string }) {
   const [state, action, pending] = useActionState(changeStatusAction, initial);
-  const options = STAFF_STATUSES.filter((s) => s !== current);
   const idPrefix = `st-${requestId}`;
 
   return (
@@ -33,15 +32,20 @@ export function StatusForm({ requestId, current }: { requestId: string; current:
       <label htmlFor={`${idPrefix}-s`} className="block text-sm font-medium">
         Новый статус
       </label>
+      {/* По умолчанию статус не выбран: заявку нельзя закрыть случайным нажатием на «Сохранить» */}
       <select
         id={`${idPrefix}-s`}
         name="status"
-        defaultValue={options[0] ?? STAFF_STATUSES[0]}
+        defaultValue=""
         className="h-11 w-full rounded-md border border-line bg-surface px-3 text-base"
       >
+        <option value="" disabled>
+          Выберите статус
+        </option>
         {STAFF_STATUSES.map((s) => (
           <option key={s} value={s}>
             {s}
+            {s === current ? " (сейчас)" : ""}
           </option>
         ))}
       </select>
@@ -64,6 +68,7 @@ export function StatusForm({ requestId, current }: { requestId: string; current:
 
 export function AnnouncementForm({ groups }: { groups: { id: string; name: string }[] }) {
   const [state, action, pending] = useActionState(publishAnnouncementAction, initial);
+  const [audience, setAudience] = useState("all");
 
   return (
     <form action={action} className="space-y-3">
@@ -74,31 +79,37 @@ export function AnnouncementForm({ groups }: { groups: { id: string; name: strin
         <select
           id="an-audience"
           name="audience"
-          defaultValue="all"
+          value={audience}
+          onChange={(e) => setAudience(e.target.value)}
           className="h-11 w-full rounded-md border border-line bg-surface px-3 text-base"
         >
           <option value="all">Всем студентам</option>
           <option value="group">Одной группе</option>
         </select>
       </div>
-      <div className="space-y-1">
-        <label htmlFor="an-group" className="block text-sm font-medium">
-          Группа (если «Одной группе»)
-        </label>
-        <select
-          id="an-group"
-          name="groupId"
-          defaultValue=""
-          className="h-11 w-full rounded-md border border-line bg-surface px-3 text-base"
-        >
-          <option value="">—</option>
-          {groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
+      {/* Поле группы нужно только для «Одной группе» */}
+      {audience === "group" && (
+        <div className="space-y-1">
+          <label htmlFor="an-group" className="block text-sm font-medium">
+            Группа
+          </label>
+          <select
+            id="an-group"
+            name="groupId"
+            defaultValue=""
+            className="h-11 w-full rounded-md border border-line bg-surface px-3 text-base"
+          >
+            <option value="" disabled>
+              Выберите группу
             </option>
-          ))}
-        </select>
-      </div>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="space-y-1">
         <label htmlFor="an-title" className="block text-sm font-medium">
           Заголовок

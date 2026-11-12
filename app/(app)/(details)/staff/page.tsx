@@ -5,7 +5,6 @@ import { listGroupsForStaff, listRequestsForStaff } from "@/lib/data/staff";
 import { Card, EmptyText, PageShell } from "@/components/ui";
 import { StatusBadge } from "@/components/status-badge";
 import { formatDateTimeRu } from "@/lib/time";
-import { logoutAction } from "@/app/login/actions";
 import { AnnouncementForm, StatusForm } from "./staff-forms";
 
 export const dynamic = "force-dynamic";
@@ -21,10 +20,6 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
 
   return (
     <PageShell title="Кабинет сотрудника">
-      <Card title="Новое объявление" id="announce">
-        <AnnouncementForm groups={groups} />
-      </Card>
-
       <Card title="Заявки студентов" id="requests">
         <nav aria-label="Фильтр по статусу" className="mb-3 flex flex-wrap gap-2">
           {[undefined, ...STAFF_FILTER_STATUSES].map((s) => (
@@ -42,7 +37,7 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
         </nav>
 
         {requests.length === 0 ? (
-          <EmptyText>Заявок с таким статусом нет.</EmptyText>
+          <EmptyText>{status ? "Заявок с таким статусом нет." : "Заявок пока нет. Когда студенты подадут заявки, они появятся здесь."}</EmptyText>
         ) : (
           <ul className="space-y-4">
             {requests.map((r) => (
@@ -66,11 +61,15 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
         )}
       </Card>
 
-      <form action={logoutAction}>
-        <button type="submit" className="h-11 w-full rounded-md border border-line bg-surface font-medium">
-          Выйти
-        </button>
-      </form>
+      {/* Объявление свёрнуто: главное дело сотрудника это заявки, форма не должна занимать первый экран */}
+      <details id="announce" className="rounded-lg border border-line bg-surface p-4">
+        <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold uppercase tracking-wide text-muted">
+          Новое объявление
+        </summary>
+        <div className="mt-3">
+          <AnnouncementForm groups={groups} />
+        </div>
+      </details>
     </PageShell>
   );
 }

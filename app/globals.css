@@ -28,3 +28,21 @@ body {
   color: var(--color-foreground);
   font-family: var(--font-sans);
 }
+
+/* Работа с клавиатуры: видимый фокус у всех интерактивных элементов */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+/* Без анимации для тех, кто её отключил в системе */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse {
+    animation: none;
+  }
+}

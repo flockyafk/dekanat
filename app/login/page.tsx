@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { LoginForm } from "./login-form";
@@ -12,9 +13,9 @@ export default async function LoginPage() {
       <h1 className="mb-1 text-2xl font-semibold">Мой деканат</h1>
       <p className="mb-6 text-sm text-muted">Войдите, чтобы увидеть своё расписание и заявки.</p>
       <LoginForm />
-      <p className="mt-6 text-sm text-muted">
-        Тестовые аккаунты — в <a href="/about" className="underline">разделе «О проекте»</a>.
-      </p>
+      <Link href="/about" className="mt-4 flex min-h-11 items-center text-brand underline">
+        Тестовые аккаунты и о проекте
+      </Link>
     </main>
   );
 }

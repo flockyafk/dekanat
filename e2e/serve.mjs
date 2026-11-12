@@ -12,6 +12,7 @@ const env = {
   DATABASE_URL: "file:../data/e2e.db",
   NEXT_DIST_DIR: ".next-e2e",
   AI_DAILY_LIMIT: process.env.AI_DAILY_LIMIT || "50",
+  E2E_FORCE_ERROR_ROUTE: "1", // включает тестовый адрес /e2e-error для проверки страницы ошибки
 };
 // Без E2E_REAL_AI помощник всегда на заглушке: ответы детерминированы, сеть не нужна
 if (process.env.E2E_REAL_AI !== "1") env.AI_PROVIDER = "stub";
@@ -25,6 +26,7 @@ const bin = (p) => path.join(root, "node_modules", p);
 
 run([bin("prisma/build/index.js"), "migrate", "deploy"]);
 run([bin("tsx/dist/cli.mjs"), "prisma/seed.ts"]);
+run([bin("tsx/dist/cli.mjs"), "e2e/extra-seed.ts"]); // студент без данных для проверки пустых состояний
 run([bin("next/dist/bin/next"), "build"]);
 
 const server = spawn(process.execPath, [bin("next/dist/bin/next"), "start", "-p", "3200"], {

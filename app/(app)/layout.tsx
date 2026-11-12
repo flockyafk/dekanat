@@ -7,12 +7,18 @@ import { BottomNav, SideNav } from "@/components/nav-links";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   const unread = await getMyUnreadCount(user);
-  const isStudent = user.role === "student";
 
   return (
     <div className="flex flex-1 flex-col">
+      {/* Пропуск к содержимому для клавиатуры: виден только при фокусе */}
+      <a
+        href="#content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-30 focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:text-brand"
+      >
+        К содержимому
+      </a>
       <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-line bg-surface px-4">
-        <Link href="/" className="flex min-h-11 items-center text-lg font-semibold text-brand">
+        <Link href={user.role === "staff" ? "/staff" : "/"} className="flex min-h-11 items-center text-lg font-semibold text-brand">
           Мой деканат
         </Link>
         <Link
@@ -29,10 +35,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </Link>
       </header>
       <div className="flex flex-1">
-        {isStudent && <SideNav />}
+        <SideNav role={user.role} />
         <div className="min-w-0 flex-1">{children}</div>
       </div>
-      {isStudent && <BottomNav />}
+      <BottomNav role={user.role} />
     </div>
   );
 }

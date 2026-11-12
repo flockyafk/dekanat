@@ -108,7 +108,7 @@ export function AskBox({ compact = false, remaining: initialRemaining }: { compa
           onChange={(e) => setValue(e.target.value)}
           maxLength={500}
           autoComplete="off"
-          placeholder="Например: что у меня завтра?"
+          placeholder="Спросите про пары, долги…"
           className="h-11 min-w-0 flex-1 rounded-md border border-line bg-surface px-3 text-base"
         />
         <button type="submit" disabled={pending} className="h-11 rounded-md bg-brand px-4 font-medium text-white disabled:opacity-60">
