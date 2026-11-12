@@ -10,6 +10,7 @@ import {
   type DraftContext,
 } from "@/lib/data/assistant";
 import { withUserLock } from "@/lib/lock";
+import { resolveScheduleDates } from "@/lib/ai-schedule";
 import { isKnownRoute } from "@/lib/routes";
 import { dateKey } from "@/lib/time";
 
@@ -101,6 +102,16 @@ function getProvider(): AiProvider | null {
   return null; // неизвестный провайдер = недоступен
 }
 
+/**
+ * Режим помощника для интерфейса: «stub» (готовые ответы), «ai» (настоящая модель) или «unavailable».
+ * Текст на странице /assistant зависит от режима: про пробную версию пишем только когда работает заглушка.
+ */
+export function assistantMode(): "stub" | "ai" | "unavailable" {
+  const provider = getProvider();
+  if (!provider) return "unavailable";
+  return provider.name === "stub" ? "stub" : "ai";
+}
+
 /** Ошибка провайдера. В сообщении только код, без тела ответа, текста вопроса и ключа. */
 export class ProviderError extends Error {
   constructor(public readonly status: number) {
@@ -174,7 +185,7 @@ export async function askAssistant(user: CurrentUser, rawQuestion: string, now: 
     return { ok: false, reason: "invalid", text: MSG.invalid };
   }
   const outcome = await callModel(user, now, async () => {
-    const context = await getAssistantContext(user, now);
+    const context = await getAssistantContext(user, now, question);
     return { request: buildProviderRequest(SYSTEM_PROMPT, context, question), context };
   });
   if (!outcome.ok) return outcome;
@@ -205,9 +216,9 @@ export function fallbackLinks(question: string, ctx: AssistantContext): Assistan
     if (matching.length === 1) add(`/requests/${matching[0].id}`, matching[0].type);
     else add("/requests", "Заявки");
   }
-  if (/завтра|сегодня|послезавтра|\bпар[ыау]?\b|расписан|занят/.test(q)) {
-    const day = /послезавтра/.test(q) ? ctx.days[2] : /завтра/.test(q) ? ctx.days[1] : ctx.days[0];
-    add(`/schedule?d=${day.date}&v=day`, "Расписание");
+  const scheduleDates = resolveScheduleDates(question, ctx.today.date);
+  if (scheduleDates.length > 0 || /(?<![а-яё])пар[ыау]?(?![а-яё])|расписан|занят/.test(q)) {
+    add(`/schedule?d=${scheduleDates[0] ?? ctx.today.date}&v=day`, "Расписание");
   }
   if (/долг|оценк|балл|экзамен|зач[её]т|сессия|успеваем|посещаем|дисциплин/.test(q)) add("/grades", "Учёба");
   if (/объявлен|уведомлен|новост/.test(q)) add("/notifications", "Уведомления");
@@ -414,25 +425,6 @@ function mentionsOtherPerson(question: string, ownName: string): boolean {
   return false;
 }
 
-function lessonsText(day: AssistantContext["days"][number], title: string): string {
-  const items = day.lessons as {
-    start: string;
-    end: string;
-    title: string;
-    kind: string;
-    room: string;
-    cancelled: boolean;
-    change: string | null;
-  }[];
-  const head = `${title} (${day.weekday}, ${day.date})`;
-  if (items.length === 0) return `${head}: пар нет.\n[[/schedule?d=${day.date}&v=day|Расписание]]`;
-  const lines = items.map(
-    (l) =>
-      `${l.start}–${l.end} ${l.title}, ${l.kind}, ${l.room}${l.cancelled ? ", ОТМЕНЕНА" : ""}${l.change && !l.cancelled ? `. ${l.change}` : ""}`,
-  );
-  return `${head}:\n${lines.join("\n")}\n[[/schedule?d=${day.date}&v=day|Расписание]]`;
-}
-
 export function stubAnswer(ctx: AssistantContext, question: string): string {
   const q = question.toLowerCase();
   if (!ctx.student) return NOT_FOUND;
@@ -443,9 +435,12 @@ export function stubAnswer(ctx: AssistantContext, question: string): string {
     return NOT_FOUND;
   }
 
-  if (/послезавтра/.test(q)) return lessonsText(ctx.days[2], "Послезавтра");
-  if (/завтра/.test(q)) return lessonsText(ctx.days[1], "Завтра");
-  if (/(сегодня|расписан|какие пары|что у меня сейчас)/.test(q)) return lessonsText(ctx.days[0], "Сегодня");
+  // Расписание на день недели, дату, «сегодня» и «завтра» уже посчитал код: заглушка, как и настоящая модель,
+  // только пересказывает готовый список «Пары на …».
+  if (ctx.scheduleAnswer.length > 0) {
+    const text = ctx.scheduleAnswer.map((a) => a.text).join("\n");
+    return `${text}\n[[/schedule?d=${ctx.scheduleAnswer[0].date}&v=day|Расписание]]`;
+  }
 
   if (/долг|хвост/.test(q)) {
     if (ctx.session.debts.length === 0) return "Долгов нет.\n[[/grades|Учёба]]";

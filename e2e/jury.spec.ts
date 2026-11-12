@@ -27,14 +27,12 @@ async function noHorizontalScroll(page: Page) {
 }
 
 /**
- * Клик по ссылке с повтором, пока адрес не сменится. Нужен, потому что клик в первые мгновения после
- * загрузки страницы, до подключения скриптов, может не дать перехода.
+ * Один клик по ссылке и проверка, что адрес сменился. Повторов нет намеренно: «потерянный клик» уже оказался
+ * настоящим дефектом (loading.tsx над страницей с параметрами адреса ломал переходы), и повторы его маскировали.
  */
 async function clickUntilUrl(page: Page, click: () => Promise<void>, url: RegExp) {
-  await expect(async () => {
-    await click();
-    await expect(page).toHaveURL(url, { timeout: 4000 });
-  }).toPass({ timeout: 40_000 });
+  await click();
+  await expect(page).toHaveURL(url, { timeout: 10_000 });
 }
 
 /** Задать вопрос помощнику на /assistant и дождаться нового ответа. */
@@ -68,6 +66,11 @@ test.describe.serial("сценарий жюри", () => {
 
   test("3. Расписание на неделю", async () => {
     await clickUntilUrl(student1, () => student1.getByRole("link", { name: "Расписание" }).last().click(), /\/schedule/);
+    await clickUntilUrl(student1, () => student1.getByRole("tab", { name: "Неделя" }).click(), /v=week/);
+    // переключения внутри расписания: день, стрелка недели, возврат на день (раньше зависали)
+    await clickUntilUrl(student1, () => student1.getByRole("tab", { name: "День" }).click(), /v=day/);
+    await clickUntilUrl(student1, () => student1.getByRole("link", { name: "Следующая неделя" }).click(), /d=\d{4}-\d{2}-\d{2}&v=day/);
+    await clickUntilUrl(student1, () => student1.getByRole("link", { name: "Предыдущая неделя" }).click(), /v=day/);
     await clickUntilUrl(student1, () => student1.getByRole("tab", { name: "Неделя" }).click(), /v=week/);
     await expect(student1.getByText(/(Верхняя|Нижняя) неделя/)).toBeVisible();
     await expect(student1.getByText("Понедельник")).toBeVisible();
@@ -149,6 +152,13 @@ test.describe.serial("сценарий жюри", () => {
     await student1.goto("/assistant");
     await student1.waitForLoadState("load");
     await student1.waitForTimeout(1500);
+    // Пояснение зависит от режима: про пробную версию только при заглушке, при настоящей модели честное предупреждение
+    if (REAL) {
+      await expect(student1.getByText(/Ответы формирует ИИ и могут содержать ошибки/)).toBeVisible();
+      await expect(student1.getByText(/пробная версия/)).toHaveCount(0);
+    } else {
+      await expect(student1.getByText(/Сейчас работает пробная версия с готовыми ответами/)).toBeVisible();
+    }
 
     const tomorrow = await ask(student1, "Что у меня завтра?");
     expect(tomorrow.links.some((l) => l.startsWith("/schedule")), `нет ссылки на расписание: ${tomorrow.text}`).toBe(true);
@@ -158,6 +168,18 @@ test.describe.serial("сценарий жюри", () => {
     expect(status.text).toMatch(/справк/i);
     if (!REAL) expect(status.text).toContain("Готова"); // заглушка отвечает точно по данным
     await noHorizontalScroll(student1);
+  });
+
+  test("10а. Помощник: расписание на день недели считает код, пары студента не теряются", async () => {
+    await student1.goto("/assistant");
+    await student1.waitForLoadState("load");
+    await student1.waitForTimeout(1500);
+    const monday = await ask(student1, "Какие пары в понедельник?");
+    expect(monday.links.some((l) => /^\/schedule\?d=\d{4}-\d{2}-\d{2}&v=day$/.test(l)), monday.text).toBe(true);
+    // в понедельник у группы студента 1 две пары (лекция в 301 и семинар в 412): «пар нет» было бы ошибкой
+    expect(monday.text).toMatch(/Теория международных отношений/);
+    expect(monday.text).toMatch(/Деловой английский/);
+    expect(monday.text).not.toMatch(/пар нет/);
   });
 
   test("11. Помощник: чужой студент и данные, которых нет, дают честный отказ без выдумок", async () => {

@@ -161,7 +161,7 @@ describe("помощник на заглушке отвечает честно �
   it("«что у меня завтра» отвечает по расписанию со ссылкой на раздел", async () => {
     const r = await ask("student1", "Что у меня завтра?");
     expect(r.links.some((l) => l.href.startsWith("/schedule"))).toBe(true);
-    expect(r.text).toMatch(/Завтра/);
+    expect(r.text).toMatch(/Пары на завтра/);
   });
 
   it("«в каком статусе моя справка» берёт заявку студента, а не чужую", async () => {

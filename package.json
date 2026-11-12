@@ -12,7 +12,8 @@
     "seed": "tsx prisma/seed.ts",
     "postinstall": "prisma generate",
     "e2e": "playwright test",
-    "redteam": "vitest run --config vitest.redteam.config.ts"
+    "redteam": "vitest run --config vitest.redteam.config.ts",
+    "redteam:schedule": "vitest run --config vitest.redteam.config.ts redteam/schedule.redteam.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

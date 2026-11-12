@@ -2,20 +2,29 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import type { CurrentUser } from "@/lib/auth";
 import { getMyProfile } from "@/lib/data/profile";
-import { getMyLessonsOn } from "@/lib/data/schedule";
+import { getMyLessonsOn, type LessonView } from "@/lib/data/schedule";
+import { describeDate, resolveScheduleDates } from "@/lib/ai-schedule";
 import { getMyCourses, getMySession } from "@/lib/data/grades";
 import { getMyLatestAnnouncements } from "@/lib/data/notifications";
 import { getMyRequest, listMyRequests } from "@/lib/data/requests";
-import { WEEKDAYS_FULL, addDays, dateKey, weekdayOf } from "@/lib/time";
+import { WEEKDAYS_FULL, addDays, dateKey, isoWeek, weekdayOf } from "@/lib/time";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
+
+/** Пара одной строкой: «10:40–12:10 Мировая экономика, лекция, ауд. 215, Крылов Д. С. ОТМЕНЕНА (причина)». */
+function lessonLine(l: LessonView): string {
+  const base = `${l.start}–${l.end} ${l.title}, ${l.kind}, ауд. ${l.room}, ${l.teacher}`;
+  if (l.cancelled) return `${base}. ОТМЕНЕНА${l.change?.comment ? ` (${l.change.comment})` : ""}`;
+  if (l.change) return `${base}. ${l.change.text}${l.change.comment ? ` (${l.change.comment})` : ""}`;
+  return base;
+}
 
 /**
  * Контекст для модели. Собирается ТОЛЬКО из данных текущего студента из сессии:
  * каждая использованная функция сама фильтрует по user.id. Данные других студентов сюда не попадают.
  */
-export async function getAssistantContext(user: CurrentUser, now: Date = new Date()) {
+export async function getAssistantContext(user: CurrentUser, now: Date = new Date(), question?: string) {
   const today = dateKey(now);
   const [profile, courses, session, announcements, requestList] = await Promise.all([
     getMyProfile(user),
@@ -25,24 +34,31 @@ export async function getAssistantContext(user: CurrentUser, now: Date = new Dat
     listMyRequests(user),
   ]);
 
-  // Пары на сегодня, завтра и послезавтра: хватает для вопроса «что у меня завтра»
-  const days = [] as { date: string; weekday: string; lessons: unknown[] }[];
-  for (let i = 0; i < 3; i++) {
+  // Расписание на ближайшие 14 дней по датам. День без пар передаётся явно: «lessons: []» значит «пар нет»,
+  // а не «данных нет». Пары берутся из расписания группы студента с учётом чётности недели и изменений.
+  const schedule = [] as { date: string; weekday: string; week: string; lessons: string[] }[];
+  for (let i = 0; i < 14; i++) {
     const date = addDays(today, i);
-    const lessons = await getMyLessonsOn(user, date);
-    days.push({
+    schedule.push({
       date,
       weekday: WEEKDAYS_FULL[weekdayOf(date) % 7],
-      lessons: lessons.map((l) => ({
-        start: l.start,
-        end: l.end,
-        title: l.title,
-        kind: l.kind,
-        room: l.room,
-        teacher: l.teacher,
-        cancelled: l.cancelled,
-        change: l.change ? `${l.change.text}${l.change.comment ? ` (${l.change.comment})` : ""}` : null,
-      })),
+      week: isoWeek(date) % 2 === 1 ? "верхняя" : "нижняя",
+      lessons: (await getMyLessonsOn(user, date)).map(lessonLine),
+    });
+  }
+
+  // Вопросы о расписании на день недели, «сегодня», «завтра» или дату считает код: модель получает готовый
+  // список «Пары на <дата>: …» или явное «пар нет» и только формулирует ответ.
+  const scheduleAnswer: { date: string; text: string }[] = [];
+  for (const date of question ? resolveScheduleDates(question, today) : []) {
+    const lessons = await getMyLessonsOn(user, date);
+    const head = `Пары на ${describeDate(date, today)}`;
+    scheduleAnswer.push({
+      date,
+      text:
+        lessons.length === 0
+          ? `${head}: пар нет.`
+          : `${head}: ${lessons.map((l, i) => `${i + 1}) ${lessonLine(l)}`).join("; ")}.`,
     });
   }
 
@@ -79,7 +95,8 @@ export async function getAssistantContext(user: CurrentUser, now: Date = new Dat
     student: profile
       ? { name: profile.fullName, group: profile.group.name, course: profile.course, direction: profile.direction }
       : null,
-    days,
+    schedule,
+    scheduleAnswer,
     deadlines: deadlines.map((d) => ({
       title: d.title,
       course: d.course?.title ?? null,
