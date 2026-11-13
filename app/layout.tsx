@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { THEME_INIT_SCRIPT } from "@/components/theme-toggle";
 
 export const metadata: Metadata = {
   title: "Мой деканат",
@@ -10,7 +11,10 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ru">
+    <html lang="ru" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="flex min-h-dvh flex-col antialiased">
         {children}
         <footer className="border-t border-line px-4 pb-20 pt-4 text-center text-xs text-muted md:pb-4">

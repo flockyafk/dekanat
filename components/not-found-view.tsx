@@ -7,7 +7,7 @@ export function NotFoundView() {
       <p className="text-5xl font-semibold text-brand">404</p>
       <h1 className="text-xl font-semibold">Такой страницы нет</h1>
       <p className="text-muted">Ссылка устарела или этой записи у вас нет.</p>
-      <Link href="/" className="flex h-11 items-center rounded-md bg-brand px-4 font-medium text-white">
+      <Link href="/" className="flex h-11 items-center rounded-md bg-brand px-4 font-medium text-on-accent">
         На экран «Сегодня»
       </Link>
     </main>

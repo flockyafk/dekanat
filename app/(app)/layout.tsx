@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Bell } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getMyUnreadCount } from "@/lib/data/notifications";
+import { Logo } from "@/components/logo";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { BottomNav, SideNav } from "@/components/nav-links";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -18,9 +20,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         К содержимому
       </a>
       <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-line bg-surface px-4">
-        <Link href={user.role === "staff" ? "/staff" : "/"} className="flex min-h-11 items-center text-lg font-semibold text-brand">
-          Мой деканат
+        <Link href={user.role === "staff" ? "/staff" : "/"} className="flex min-h-11 items-center text-lg">
+          <Logo />
         </Link>
+        <div className="flex items-center">
+        <ThemeToggle />
         <Link
           href="/notifications"
           aria-label={unread ? `Уведомления, непрочитанных: ${unread}` : "Уведомления"}
@@ -28,11 +32,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         >
           <Bell aria-hidden className="size-6" />
           {unread > 0 && (
-            <span className="absolute right-1 top-1 flex min-w-5 items-center justify-center rounded-lg bg-danger px-1 text-xs font-semibold text-white">
+            <span className="absolute right-1 top-1 flex min-w-5 items-center justify-center rounded-lg bg-danger px-1 text-xs font-semibold text-on-accent">
               {unread}
             </span>
           )}
         </Link>
+        </div>
       </header>
       <div className="flex flex-1">
         <SideNav role={user.role} />

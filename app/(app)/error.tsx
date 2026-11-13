@@ -10,7 +10,7 @@ export default function ErrorPage({ reset }: { error: Error; reset: () => void }
         <h1 className="text-lg font-semibold">Не получилось загрузить страницу.</h1>
         <p className="mt-1 text-sm">Проверьте соединение и попробуйте ещё раз. Остальной кабинет работает.</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button onClick={reset} className="h-11 rounded-md bg-brand px-4 font-medium text-white">
+          <button onClick={reset} className="h-11 rounded-md bg-brand px-4 font-medium text-on-accent">
             Попробовать снова
           </button>
           <Link href="/" className="flex h-11 items-center rounded-md border border-line bg-surface px-4 font-medium text-foreground">

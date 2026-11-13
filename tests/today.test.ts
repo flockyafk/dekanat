@@ -122,6 +122,24 @@ describe("смена пароля", () => {
     expect(r.ok).toBe(false);
   });
 
+  it("student4 создан сидом, пароль у него менять можно, а при следующем старте он возвращается к демо-значению", async () => {
+    const { ensureSpareStudent, SPARE_PASSWORD } = await import("../prisma/refresh-demo");
+    const me = await userOf("student4");
+    const wrong = await changeMyPassword(me, "wrong", "new-password-1");
+    expect(wrong.ok === false && wrong.error).toBe("Текущий пароль указан неверно.");
+    const r = await changeMyPassword(me, SPARE_PASSWORD, "new-password-1");
+    expect(r.ok).toBe(true);
+    await prisma.session.create({ data: { id: "spare-session", userId: me.id, expiresAt: new Date(Date.now() + 60000) } });
+    await ensureSpareStudent(prisma);
+    const row = await prisma.user.findUniqueOrThrow({ where: { id: me.id } });
+    expect(await bcrypt.compare(SPARE_PASSWORD, row.passwordHash)).toBe(true);
+    expect(await prisma.session.count({ where: { userId: me.id } })).toBe(0);
+    await prisma.loginAttempt.deleteMany({ where: { key: `pwd:${me.id}` } });
+    // чужие данные не тронуты: пароль student2 прежний
+    const s2 = await prisma.user.findUniqueOrThrow({ where: { login: "student2" } });
+    expect(await bcrypt.compare("demo-student-2", s2.passwordHash)).toBe(true);
+  });
+
   it("свой пароль меняется, чужой не затрагивается", async () => {
     const u = await prisma.user.upsert({
       where: { login: "tmp-user" },

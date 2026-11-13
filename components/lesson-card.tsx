@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui";
+import { roomLabel } from "@/lib/room";
 import type { LessonView } from "@/lib/data/schedule";
 
 /** Карточка пары: время, предмет, тип, аудитория, преподаватель, изменения. */
@@ -20,7 +21,7 @@ export function LessonCard({ lesson }: { lesson: LessonView }) {
           <p className="text-sm text-muted">{lesson.end}</p>
         </div>
       </div>
-      <p className="mt-1 text-sm">Аудитория {lesson.room}</p>
+      <p className="mt-1 text-sm">{roomLabel(lesson.room)}</p>
       {ch && (
         <p className="mt-2">
           <Badge tone={lesson.cancelled ? "danger" : "warn"}>{ch.text}</Badge>

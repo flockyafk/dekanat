@@ -15,12 +15,52 @@
   --color-warn-bg: #fef3c7;
   --color-ok: #166534;
   --color-ok-bg: #dcfce7;
+  --color-on-accent: #ffffff; /* текст на брендовом и красном фоне */
 
   --radius-sm: 0.375rem;
   --radius-md: 0.625rem;
   --radius-lg: 1rem;
 
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Тёмная тема: те же имена цветов, другие значения. Включается атрибутом data-theme="dark" на <html>
+   (его ставит переключатель и скрипт в layout.tsx), а без скриптов следует настройке системы. */
+:root[data-theme="dark"] {
+  --color-background: #0b1220;
+  --color-foreground: #e2e8f0;
+  --color-surface: #131c2e;
+  --color-line: #475569;
+  --color-muted: #a9b6c9;
+  --color-brand: #8ab4ff;
+  --color-brand-soft: #1b2f57;
+  --color-danger: #f87171;
+  --color-danger-bg: #4a1414;
+  --color-warn: #fcd34d;
+  --color-warn-bg: #46300a;
+  --color-ok: #86efac;
+  --color-ok-bg: #0f3a22;
+  --color-on-accent: #0b1220;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-background: #0b1220;
+    --color-foreground: #e2e8f0;
+    --color-surface: #131c2e;
+    --color-line: #475569;
+    --color-muted: #a9b6c9;
+    --color-brand: #8ab4ff;
+    --color-brand-soft: #1b2f57;
+    --color-danger: #f87171;
+    --color-danger-bg: #4a1414;
+    --color-warn: #fcd34d;
+    --color-warn-bg: #46300a;
+    --color-ok: #86efac;
+    --color-ok-bg: #0f3a22;
+    --color-on-accent: #0b1220;
+    color-scheme: dark;
+  }
 }
 
 body {
@@ -45,4 +85,10 @@ textarea:focus-visible,
   .animate-pulse {
     animation: none;
   }
+}
+
+/* Переключатель темы: иконка зависит от текущей темы */
+:root[data-theme="dark"] .theme-to-dark,
+:root:not([data-theme="dark"]) .theme-to-light {
+  display: none;
 }

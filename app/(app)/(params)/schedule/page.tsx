@@ -70,7 +70,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
               aria-selected={view === v}
               href={href(selected, v)}
               className={`flex min-h-11 min-w-20 items-center justify-center rounded-sm px-3 text-sm font-medium ${
-                view === v ? "bg-brand text-white" : "text-foreground"
+                view === v ? "bg-brand text-on-accent" : "text-foreground"
               }`}
             >
               {v === "day" ? "День" : "Неделя"}
@@ -112,13 +112,13 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
                       href={href(date)}
                       aria-current={active ? "date" : undefined}
                       className={`flex min-h-14 flex-col items-center justify-center rounded-md border text-sm ${
-                        active ? "border-brand bg-brand text-white" : "border-line bg-surface"
+                        active ? "border-brand bg-brand text-on-accent" : "border-line bg-surface"
                       }`}
                     >
                       <span className="font-medium">{WEEKDAYS_SHORT[weekdayOf(date) % 7]}</span>
-                      <span className={active ? "text-white" : "text-muted"}>{Number(date.slice(8))}</span>
+                      <span className={active ? "text-on-accent" : "text-muted"}>{Number(date.slice(8))}</span>
                       {hasChange && <span className="sr-only">есть изменения</span>}
-                      {hasChange && <span aria-hidden className={`mt-0.5 size-1.5 rounded-lg ${active ? "bg-white" : "bg-warn"}`} />}
+                      {hasChange && <span aria-hidden className={`mt-0.5 size-1.5 rounded-lg ${active ? "bg-on-accent" : "bg-warn"}`} />}
                     </Link>
                   </li>
                 );

@@ -1,6 +1,6 @@
 # Системный промпт помощника «Спроси деканат», версия v4
 
-Дата: 19 ноября 2026. Источник в коде: `lib/ai-prompt.ts` (`SYSTEM_PROMPT`, `SYSTEM_PROMPT_VERSION = "v4"`).
+Дата: 13 ноября 2026. Источник в коде: `lib/ai-prompt.ts` (`SYSTEM_PROMPT`, `SYSTEM_PROMPT_VERSION = "v4"`).
 Модель: Qwen3-30B на Amvera LLM (`qwen3_30b`), температура 0,2. Промпт черновика заявки остался v3 (см. `assistant-system-v2.md`).
 
 ## Что изменилось по сравнению с v3

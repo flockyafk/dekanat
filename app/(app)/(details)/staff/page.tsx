@@ -28,7 +28,7 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
               href={s ? `/staff?status=${encodeURIComponent(s)}` : "/staff"}
               aria-current={status === s ? "true" : undefined}
               className={`flex min-h-11 items-center rounded-lg border px-3 text-sm ${
-                status === s ? "border-brand bg-brand text-white" : "border-line bg-surface"
+                status === s ? "border-brand bg-brand text-on-accent" : "border-line bg-surface"
               }`}
             >
               {s ?? "Все"}

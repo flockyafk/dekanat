@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { Logo } from "@/components/logo";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { getCurrentUser } from "@/lib/auth";
 
 export const metadata = { title: "О проекте — Мой деканат" };
@@ -9,6 +11,11 @@ const accounts = [
   { who: "Студент 1 (группа 1)", login: "student1", password: "demo-student-1" },
   { who: "Студент 2 (группа 1)", login: "student2", password: "demo-student-2" },
   { who: "Студент 3 (группа 2)", login: "student3", password: "demo-student-3" },
+  {
+    who: "Студент 4 (группа 2), здесь можно проверить смену пароля",
+    login: "student4",
+    password: "demo-student-4",
+  },
   { who: "Сотрудник деканата", login: "staff", password: "demo-staff-1" },
 ];
 
@@ -19,9 +26,13 @@ export default async function AboutPage() {
 
   return (
     <main id="content" className="mx-auto w-full max-w-xl flex-1 px-4 py-8">
-      <Link href={back.href} className="-mt-2 mb-2 inline-flex min-h-11 items-center gap-1 text-brand underline">
-        <ArrowLeft aria-hidden className="size-4" /> {back.label}
-      </Link>
+      <div className="mb-2 flex items-center justify-between">
+        <Link href={back.href} className="inline-flex min-h-11 items-center gap-1 text-brand underline">
+          <ArrowLeft aria-hidden className="size-4" /> {back.label}
+        </Link>
+        <ThemeToggle />
+      </div>
+      <Logo className="mb-3 text-xl" />
       <h1 className="mb-2 text-2xl font-semibold">О проекте</h1>
       <p className="mb-4 text-muted">
         «Мой деканат» — концепт личного кабинета студента для MGIMO AI Challenge. Все данные вымышленные.
@@ -38,6 +49,11 @@ export default async function AboutPage() {
           </li>
         ))}
       </ul>
+      <p className="mt-3 text-sm text-muted">
+        У первых трёх студентов и у сотрудника смена пароля выключена, чтобы вход всегда работал. Студент 4 нужен
+        для проверки: зайдите в «Профиль», смените пароль и войдите с новым. Пароль этого аккаунта может сменить любой
+        посетитель, поэтому при каждом запуске сервера он возвращается к демо-значению.
+      </p>
     </main>
   );
 }

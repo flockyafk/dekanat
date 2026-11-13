@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { requireUser } from "@/lib/auth";
+import { roomLabel } from "@/lib/room";
 import { getTodayData } from "@/lib/data/today";
 import { getMyProfile } from "@/lib/data/profile";
 import { Badge, Card, EmptyText, PageShell } from "@/components/ui";
@@ -43,7 +44,7 @@ export default async function TodayPage() {
               {next.lesson.start}–{next.lesson.end}, {next.lesson.kind}
             </p>
             <p className="text-muted">
-              Аудитория {next.lesson.room}, {next.lesson.teacher}
+              {roomLabel(next.lesson.room)}, {next.lesson.teacher}
             </p>
             {next.lesson.change && <p className="mt-2"><Badge tone="warn">{next.lesson.change.text}</Badge></p>}
           </div>

@@ -141,7 +141,7 @@ export function AskBox({
           placeholder="Спросите про пары, долги…"
           className="h-11 min-w-0 flex-1 rounded-md border border-line bg-surface px-3 text-base"
         />
-        <button type="submit" disabled={pending} className="h-11 rounded-md bg-brand px-4 font-medium text-white disabled:opacity-60">
+        <button type="submit" disabled={pending} className="h-11 rounded-md bg-brand px-4 font-medium text-on-accent disabled:opacity-60">
           Спросить
         </button>
       </form>

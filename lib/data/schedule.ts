@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { roomLabel } from "@/lib/room";
 import type { CurrentUser } from "@/lib/auth";
 import { SLOT_TIMES, addDays, dateKey, dayStart, minutesOfDay, toMinutes, weekParityOf, weekdayOf } from "@/lib/time";
 
@@ -46,7 +47,7 @@ async function lessonsForGroup(groupId: string | null, day: string): Promise<Les
     let text = "";
     if (ch?.kind === "отмена") text = "Пара отменена";
     if (ch?.kind === "перенос" && ch.newSlot) text = `Перенесена на ${SLOT_TIMES[ch.newSlot].start}`;
-    if (ch?.kind === "замена аудитории" && ch.newRoom) text = `Аудитория ${l.room} → ${ch.newRoom}`;
+    if (ch?.kind === "замена аудитории" && ch.newRoom) text = `${roomLabel(l.room)} → ${roomLabel(ch.newRoom)}`;
     return {
       id: l.id,
       date: day,

@@ -50,7 +50,7 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={pending}
-        className="h-11 w-full rounded-md bg-brand text-base font-medium text-white disabled:opacity-60"
+        className="h-11 w-full rounded-md bg-brand text-base font-medium text-on-accent disabled:opacity-60"
       >
         {pending ? "Входим…" : "Войти"}
       </button>

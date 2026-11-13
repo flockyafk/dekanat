@@ -7,6 +7,7 @@
 // Окно видимости: переносы заданы на 9 ноября - 13 декабря, дедлайны разложены так, что в любом семидневном окне
 // с 12 ноября по 4 декабря (в том числе на всё время проверки 21-28 ноября) есть хотя бы один будущий срок.
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 import { addDays, dayStart, weekParityOf, weekdayOf } from "../lib/time";
 
 /** Срок 18:00 по Москве (15:00 UTC) в указанную дату. */
@@ -50,9 +51,56 @@ const COMMENT = {
   отмена: "Преподаватель на конференции",
 } as const;
 
+/**
+ * Пятый тестовый аккаунт: student4. В отличие от остальных, у него смена пароля РАЗРЕШЕНА (его нет в DEMO_LOGINS),
+ * чтобы жюри могло проверить смену пароля. Чтобы после проверки вход всегда работал, при каждом старте
+ * контейнера пароль возвращается к демо-значению, а открытые сессии этого аккаунта закрываются.
+ */
+export const SPARE_LOGIN = "student4";
+export const SPARE_PASSWORD = "demo-student-4";
+
+export async function ensureSpareStudent(prisma: PrismaClient) {
+  const existing = await prisma.user.findUnique({ where: { login: SPARE_LOGIN } });
+  if (existing) {
+    if (!(await bcrypt.compare(SPARE_PASSWORD, existing.passwordHash))) {
+      await prisma.$transaction([
+        prisma.user.update({ where: { id: existing.id }, data: { passwordHash: bcrypt.hashSync(SPARE_PASSWORD, 10) } }),
+        prisma.session.deleteMany({ where: { userId: existing.id } }),
+      ]);
+    }
+    return;
+  }
+  const group = await prisma.group.findFirst({ where: { name: "МЭО-232" } });
+  if (!group) {
+    console.warn("student4 не создан: нет группы МЭО-232");
+    return;
+  }
+  const courses = await prisma.course.findMany({ where: { title: { in: ["Деловой английский", "Мировая экономика"] } } });
+  const user = await prisma.user.create({
+    data: {
+      login: SPARE_LOGIN,
+      passwordHash: bcrypt.hashSync(SPARE_PASSWORD, 10),
+      role: "student",
+      profile: {
+        create: {
+          fullName: "Кузнецов Илья Андреевич",
+          faculty: "Международных экономических отношений",
+          direction: "Экономика",
+          course: 3,
+          groupId: group.id,
+          recordBook: "Т-23104",
+          email: "ilya.kuznetsov@example.test",
+        },
+      },
+    },
+  });
+  await prisma.enrollment.createMany({ data: courses.map((c) => ({ studentId: user.id, courseId: c.id })) });
+}
+
 export async function refreshDemoDates(prisma: PrismaClient) {
   const groups = await prisma.group.findMany();
   if (groups.length === 0) return;
+  await ensureSpareStudent(prisma);
 
   // Изменения расписания на каждый будний день окна. Пары группы читаются один раз, вставка одним запросом.
   const lessons = await prisma.lesson.findMany({ orderBy: { slot: "asc" } });

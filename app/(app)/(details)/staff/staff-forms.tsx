@@ -59,7 +59,7 @@ export function StatusForm({ requestId, current }: { requestId: string; current:
         className="h-11 w-full rounded-md border border-line bg-surface px-3 text-base"
       />
       <Message state={state} />
-      <button type="submit" disabled={pending} className="h-11 w-full rounded-md bg-brand font-medium text-white disabled:opacity-60">
+      <button type="submit" disabled={pending} className="h-11 w-full rounded-md bg-brand font-medium text-on-accent disabled:opacity-60">
         {pending ? "Сохраняем…" : "Сохранить статус"}
       </button>
     </form>
@@ -134,7 +134,7 @@ export function AnnouncementForm({ groups }: { groups: { id: string; name: strin
         />
       </div>
       <Message state={state} />
-      <button type="submit" disabled={pending} className="h-11 w-full rounded-md bg-brand font-medium text-white disabled:opacity-60">
+      <button type="submit" disabled={pending} className="h-11 w-full rounded-md bg-brand font-medium text-on-accent disabled:opacity-60">
         {pending ? "Публикуем…" : "Опубликовать"}
       </button>
     </form>

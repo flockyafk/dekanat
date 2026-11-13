@@ -44,7 +44,7 @@ export function PasswordForm() {
       <button
         type="submit"
         disabled={pending}
-        className="h-11 w-full rounded-md bg-brand font-medium text-white disabled:opacity-60"
+        className="h-11 w-full rounded-md bg-brand font-medium text-on-accent disabled:opacity-60"
       >
         {pending ? "Сохраняем…" : "Сменить пароль"}
       </button>

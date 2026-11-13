@@ -81,7 +81,7 @@ describe("переносы, замены и отмены", () => {
     expect(moved.start).toBe("16:00");
     expect(moved.change?.text).toContain("Перенесена");
     expect(replaced.room).toBe("999");
-    expect(replaced.change?.text).toContain("→ 999");
+    expect(replaced.change?.text).toContain("→ Аудитория 999");
 
     // тот же день на следующей неделе не затронут
     const nextWeek = await getMyLessonsOn(s1, "2026-11-23");
