@@ -13,7 +13,8 @@
     "postinstall": "prisma generate",
     "e2e": "playwright test",
     "redteam": "vitest run --config vitest.redteam.config.ts",
-    "redteam:schedule": "vitest run --config vitest.redteam.config.ts redteam/schedule.redteam.ts"
+    "redteam:schedule": "vitest run --config vitest.redteam.config.ts redteam/schedule.redteam.ts",
+    "scan:history": "node scripts/scan-history.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
