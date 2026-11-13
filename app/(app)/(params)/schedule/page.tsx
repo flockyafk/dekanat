@@ -166,6 +166,18 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
           ))}
         </div>
       )}
+
+      <p className="pt-2">
+        {/* Обычная ссылка, не Link: это файл, а не страница */}
+        <a
+          href="/schedule.ics"
+          download
+          className="flex min-h-11 items-center justify-center rounded-md border border-brand bg-surface px-4 font-medium text-brand"
+        >
+          Добавить в календарь (.ics)
+        </a>
+        <span className="mt-1 block text-center text-xs text-muted">Пары на 5 недель вперёд из вашего расписания</span>
+      </p>
     </PageShell>
   );
 }
