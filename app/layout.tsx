@@ -5,9 +5,11 @@ import { THEME_INIT_SCRIPT } from "@/components/theme-toggle";
 export const metadata: Metadata = {
   title: "Мой деканат",
   description: "Личный кабинет студента. Концепт для MGIMO AI Challenge.",
+  icons: { icon: "/icon.svg", apple: "/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: "Деканат", statusBarStyle: "default" },
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1 };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#1d4ed8" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (

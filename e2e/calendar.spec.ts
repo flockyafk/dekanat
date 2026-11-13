@@ -37,3 +37,16 @@ test("без входа 401, у сотрудника 404", async ({ page, browse
   await login(page, "staff", "demo-staff-1", "/staff");
   expect((await page.request.get("/schedule.ics")).status()).toBe(404);
 });
+
+test("PWA: манифест и иконки открываются без входа, в head есть ссылка на манифест", async ({ page, browser }) => {
+  const anon = await browser.newContext();
+  const m = await anon.request.get("/manifest.webmanifest");
+  expect(m.status()).toBe(200);
+  expect((await m.json()).name).toBe("Мой деканат");
+  expect((await anon.request.get("/icon-192.png")).status()).toBe(200);
+  expect((await anon.request.get("/icon-maskable-512.png")).status()).toBe(200);
+  await anon.close();
+  await page.goto("/login");
+  await expect(page.locator('link[rel="manifest"]')).toHaveCount(1);
+  await expect(page.locator('meta[name="theme-color"]')).toHaveCount(1);
+});

@@ -35,8 +35,26 @@ describe("экспорт расписания в .ics", () => {
     expect(ics).toContain("Теория международных отношений");
     expect(ics).toContain("DTSTART:20261116T060000Z"); // понедельник 16 ноября, 09:00 по Москве
     expect(ics).not.toContain("Статистика"); // дисциплина только у другой группы
-    const cancelled = await prisma.lessonChange.findMany({ where: { kind: "отмена" } });
-    expect(cancelled.length).toBeGreaterThan(0);
+  });
+
+  it("отменённая пара в файл не попадает", async () => {
+    const me = await userOf("student1");
+    const before = (await getMyIcs(me, NOW))!;
+    // понедельник 16 ноября, первая пара группы студента 1 (верхняя неделя)
+    const lesson = await prisma.lesson.findFirstOrThrow({
+      where: { weekday: 1, slot: 1, group: { profiles: { some: { userId: me.id } } } },
+    });
+    const date = new Date("2026-11-23T00:00:00Z"); // так хранятся даты изменений (dayStart): понедельник 23 ноября
+    await prisma.lessonChange.deleteMany({ where: { lessonId: lesson.id, date } });
+    const ch = await prisma.lessonChange.create({ data: { lessonId: lesson.id, date, kind: "отмена", comment: "тест" } });
+    try {
+      const after = (await getMyIcs(me, NOW))!;
+      expect(events(after).length).toBe(events(before).length - 1);
+      expect(unfold(after)).not.toContain(`UID:${lesson.id}-2026-11-23-${me.id}@dekanat.concept`);
+      expect(unfold(before)).toContain(`UID:${lesson.id}-2026-11-23-${me.id}@dekanat.concept`);
+    } finally {
+      await prisma.lessonChange.delete({ where: { id: ch.id } });
+    }
   });
 
   it("студент А не получает пары студента Б: разные группы дают разные события и uid", async () => {
