@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell } from "lucide-react";
+import { Bell, Search } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getMyUnreadCount } from "@/lib/data/notifications";
 import { Logo } from "@/components/logo";
@@ -24,6 +24,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Logo />
         </Link>
         <div className="flex items-center">
+        {user.role === "student" && (
+          <Link href="/search" aria-label="Поиск" className="flex size-11 items-center justify-center rounded-md hover:bg-background">
+            <Search aria-hidden className="size-6" />
+          </Link>
+        )}
         <ThemeToggle />
         <Link
           href="/notifications"

@@ -9,6 +9,7 @@ const STATIC_ROUTES = [
   "/notifications",
   "/assistant",
   "/profile",
+  "/search",
   "/about",
 ];
 
