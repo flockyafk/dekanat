@@ -13,7 +13,7 @@ const OUT_PDF = resolve(OUT_DIR, "moy-dekanat-opisanie.pdf");
 
 const TITLE = "Мой деканат. Описание работы";
 const SITE = "https://dekanat-flockyafk.msk1.amvera.tech";
-const AUTHOR = "Автор проекта: flockyafk (GitHub), репозиторий flockyafk/dekanat";
+const AUTHOR = "Автор: Зинченко Артур, группа 1МЭО-12, МГИМО. GitHub: flockyafk (репозиторий flockyafk/dekanat)";
 const NOTE = "Концепт для MGIMO AI Challenge. Не официальный сервис вуза";
 const SUBTITLE = "MGIMO AI Challenge, номинация «Вайб-кодинг». Все данные вымышленные.";
 
