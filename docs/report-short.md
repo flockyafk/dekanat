@@ -54,7 +54,7 @@ MGIMO AI Challenge, номинация «Вайб-кодинг». Концепт
 
 ![Успеваемость: средний балл, долги, дисциплины](docs/screens/09-deployed-grades-mobile.png) ![Страница заявки со статусами](docs/screens/14-deployed-request-detail-mobile.png)
 
-![Кабинет сотрудника: очередь заявок](docs/screens/19-deployed-staff-requests-mobile.png)
+![Кабинет сотрудника: очередь заявок](docs/screens/19-deployed-staff-requests-mobile.png) ![Импорт расписания в календарь iPhone](docs/screens/30-ics-import-iphone.png)
 
 Стек: Next.js 15, TypeScript, Tailwind CSS, SQLite через Prisma, zod, bcryptjs, Vitest, Playwright. Лицензии всех библиотек открытые, список в `docs/licenses.md`.
 
