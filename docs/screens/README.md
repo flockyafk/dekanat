@@ -38,7 +38,7 @@
 - `18-deployed-staff-announcement-mobile.png`: сотрудник, объявление.
 - `19-deployed-staff-requests-mobile.png`: сотрудник, заявки.
 
-## Настоящая модель (12–13 ноября)
+## Настоящая модель (12-13 ноября)
 - `20-assistant-real-model-schedule-mobile.png`: ответ модели о расписании (ошибка «пар нет», записана в `docs/ai-errors.md`).
 - `21-today-assistant-block-deadline-mobile.png`: блок помощника на «Сегодня», ответ про ближайший дедлайн.
 - `22-requests-new-draft-box-mobile.png`: новая заявка, блок «Черновик с помощью ИИ».
