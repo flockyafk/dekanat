@@ -57,7 +57,7 @@ function splitRow(line) {
 }
 
 function convert(md) {
-  const lines = md.split("\n");
+  const lines = md.split(/\r?\n/);
   const out = [];
   let i = 0;
   while (i < lines.length) {
